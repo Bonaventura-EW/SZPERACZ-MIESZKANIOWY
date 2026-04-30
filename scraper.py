@@ -548,6 +548,35 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         promo_count = sum(1 for l in result["listings"] if l.get("is_promoted"))
         promo_pct   = round(promo_count / total * 100, 1) if total > 0 else 0
 
+        # Price distribution snapshot (all active listings with price)
+        def build_price_distribution(listings):
+            prices = sorted([l["price"] for l in listings if l.get("price") and l["price"] > 0])
+            if not prices:
+                return []
+            # Auto bucket step: aim for ~14 buckets, nice round number
+            mn, mx = prices[0], prices[-1]
+            if mn == mx:
+                return [{"from": mn, "to": mx + 1, "count": len(prices)}]
+            raw = (mx - mn) / 14
+            mag = 10 ** int(len(str(int(raw))) - 1)
+            step = next((f * mag for f in [1, 2, 2.5, 5, 10] if f * mag >= raw), 10 * mag)
+            start = (mn // step) * step
+            buckets = []
+            s = start
+            while s <= mx:
+                cnt = sum(1 for p in prices if p >= s and p < s + step)
+                buckets.append({"from": int(s), "to": int(s + step), "count": cnt})
+                s += step
+            # last price edge case
+            if prices[-1] >= s - step:
+                buckets[-1]["count"] += sum(1 for p in prices if p >= s)
+            # trim empty edges
+            while len(buckets) > 1 and buckets[-1]["count"] == 0: buckets.pop()
+            while len(buckets) > 1 and buckets[0]["count"] == 0:  buckets.pop(0)
+            return buckets
+
+        price_dist = build_price_distribution(result["listings"])
+
         # Median from NEW listings only
         new_prices = [l["price"] for l in newly_detected if l.get("price") and l["price"] > 0]
         if new_prices:
@@ -565,6 +594,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 today_entry["median_price"]        = median_price
                 today_entry["promoted_count"]      = promo_count
                 today_entry["promoted_percentage"] = promo_pct
+                today_entry["price_distribution"]  = price_dist
                 prev_added   = today_entry.get("added") or 0
                 prev_removed = today_entry.get("removed") or 0
                 if flow_added is not None:
@@ -579,6 +609,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 "date": today, "count": result["count"], "change": ch,
                 "timestamp": now_str, "median_price": median_price,
                 "promoted_count": promo_count, "promoted_percentage": promo_pct,
+                "price_distribution": price_dist,
                 "refreshed_count": 0, "reactivated_count": 0,
                 "added": flow_added, "removed": flow_removed,
             })
