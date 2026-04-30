@@ -1,5 +1,26 @@
 {
-  "profiles": {},
-  "scan_history": [],
-  "last_scan": null
+  "profiles": {
+    "mieszkania_lublin": {
+      "label": "Mieszkania na wynajem — Lublin",
+      "url": "https://www.olx.pl/nieruchomosci/mieszkania/wynajem/lublin/",
+      "is_category": true,
+      "daily_counts": [],
+      "current_listings": [],
+      "archived_listings": [],
+      "price_history": {}
+    }
+  },
+  "scan_history": [
+    {
+      "timestamp": "2026-04-30 06:15:20",
+      "date": "2026-04-30",
+      "profiles": {
+        "mieszkania_lublin": {
+          "count": 0,
+          "crosscheck": "passed"
+        }
+      }
+    }
+  ],
+  "last_scan": "2026-04-30 06:15:20"
 }
