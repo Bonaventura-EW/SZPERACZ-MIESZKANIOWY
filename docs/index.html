@@ -476,6 +476,7 @@ function renderAll() {
 }
 
 // ─── Scan Info ─────────────────────────────────────────────
+let _countdownInterval = null;
 function renderScanInfo() {
   const ls = dashData.last_scan;
   if (!ls) return;
@@ -486,7 +487,8 @@ function renderScanInfo() {
   if (now >= next) next.setDate(next.getDate()+1);
   document.getElementById('nextScanTime').textContent = fmtDT(next);
   updateCountdown(next);
-  setInterval(() => updateCountdown(next), 60000);
+  if (_countdownInterval) clearInterval(_countdownInterval);
+  _countdownInterval = setInterval(() => updateCountdown(next), 60000);
 }
 function updateCountdown(target) {
   const diff = target - new Date();
@@ -543,6 +545,7 @@ function closeDetail() {
   detailOpen = false;
   document.getElementById('detailPanel').classList.remove('visible');
   renderHeroCard();
+  if (window.innerWidth <= 768) window.scrollTo({top:0, behavior:'smooth'});
 }
 function renderDetail() {
   const profiles = dashData.profiles || {};
@@ -1039,7 +1042,7 @@ async function triggerScan() {
 function showToast(msg, type='info') {
   const t = document.getElementById('toast');
   t.textContent=msg; t.className=`status-toast ${type} visible`;
-  setTimeout(()=>t.classList.remove('visible'), 5000);
+  setTimeout(()=>t.classList.remove('visible'), type==='success' ? 7000 : 5000);
 }
 function esc(str) { const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
 
