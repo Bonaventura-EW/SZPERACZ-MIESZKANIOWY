@@ -117,6 +117,26 @@ body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-
 .detail-stat-value{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--accent);}
 .detail-stat-label{font-size:10px;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;}
 
+/* ─── Price histogram ─── */
+.price-hist-section{padding:24px;border-bottom:1px solid var(--border);}
+.price-hist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.price-hist-title{font-family:var(--font-display);font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.7px;}
+.price-hist-meta{font-family:var(--font-display);font-size:11px;color:var(--text-muted);}
+.price-hist-bars{display:flex;align-items:flex-end;gap:4px;height:160px;padding:24px 4px 0;position:relative;}
+.price-hist-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
+.price-hist-bar{width:100%;background:var(--accent);border-radius:4px 4px 0 0;transition:all var(--transition);position:relative;min-height:3px;opacity:0.85;cursor:pointer;}
+.price-hist-bar:hover{opacity:1;background:var(--chart-bar-hover);}
+.price-hist-bar.median-bar{background:var(--green);}
+.price-hist-count{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--font-display);font-size:10px;font-weight:700;color:var(--text-primary);white-space:nowrap;}
+.price-hist-label{font-family:var(--font-display);font-size:9px;color:var(--text-muted);margin-top:6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
+.price-hist-legend{display:flex;gap:16px;margin-top:12px;font-family:var(--font-display);font-size:11px;color:var(--text-muted);flex-wrap:wrap;}
+.price-hist-legend span{display:flex;align-items:center;gap:5px;}
+.legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0;}
+.price-hist-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:1px;background:var(--border);margin-top:16px;border-radius:var(--radius-sm);overflow:hidden;}
+.price-hist-stat{background:var(--bg-card);padding:12px 14px;text-align:center;}
+.price-hist-stat-val{font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--accent);}
+.price-hist-stat-lbl{font-size:10px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.4px;}
+
 /* ─── Line chart ─── */
 .line-chart-section{padding:24px;border-bottom:1px solid var(--border);}
 .line-chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
@@ -268,6 +288,20 @@ body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-
 
     <div class="detail-stats" id="detailStats"></div>
 
+    <!-- Price histogram -->
+    <div class="price-hist-section">
+      <div class="price-hist-header">
+        <div class="price-hist-title">💰 ROZKŁAD AKTUALNYCH CEN</div>
+        <div class="price-hist-meta" id="priceHistMeta">—</div>
+      </div>
+      <div class="price-hist-bars" id="priceHistBars"></div>
+      <div class="price-hist-legend">
+        <span><span class="legend-dot" style="background:var(--accent)"></span>Przedział cenowy</span>
+        <span><span class="legend-dot" style="background:var(--green)"></span>Przedział z medianą</span>
+      </div>
+      <div class="price-hist-stats" id="priceHistStats"></div>
+    </div>
+
     <!-- Line chart -->
     <div class="line-chart-section">
       <div class="line-chart-header">
@@ -344,6 +378,7 @@ let currentMetric = 'count';
 let sortCol       = 'first_seen';
 let sortAsc       = false;
 let lineChart     = null;
+let priceHistChart = null;
 
 // ─── Data Loading ──────────────────────────────────────────
 async function loadData() {
@@ -447,6 +482,7 @@ function renderDetail() {
   const data = profiles[key];
   document.getElementById('detailTitle').textContent = data.label || key;
   renderStats(key);
+  renderPriceHistogram(key);
   renderLineChart(key);
   renderListings(currentTab);
 }
@@ -480,6 +516,88 @@ function renderStats(key) {
     <div class="detail-stat"><div class="detail-stat-value">${latest.added||0}</div><div class="detail-stat-label">Przybyło</div></div>
     <div class="detail-stat"><div class="detail-stat-value">${latest.removed||0}</div><div class="detail-stat-label">Zniknęło</div></div>
   `;
+}
+
+// ─── Price Histogram ───────────────────────────────────────
+function renderPriceHistogram(key) {
+  const data     = dashData.profiles[key];
+  const listings = (data.current_listings || []).filter(l => l.price && l.price > 0);
+
+  const barsEl  = document.getElementById('priceHistBars');
+  const statsEl = document.getElementById('priceHistStats');
+  const metaEl  = document.getElementById('priceHistMeta');
+
+  if (!listings.length) {
+    barsEl.innerHTML  = `<div style="width:100%;text-align:center;color:var(--text-muted);font-size:13px;padding:40px 0;font-family:var(--font-display);">Brak ogłoszeń z cenami</div>`;
+    statsEl.innerHTML = '';
+    metaEl.textContent = '—';
+    return;
+  }
+
+  const prices = listings.map(l => l.price).sort((a,b) => a-b);
+  const minP   = prices[0];
+  const maxP   = prices[prices.length - 1];
+  const avgP   = Math.round(prices.reduce((a,b) => a+b, 0) / prices.length);
+  const n      = prices.length;
+  const medP   = n % 2 !== 0 ? prices[Math.floor(n/2)] : Math.round((prices[n/2-1] + prices[n/2])/2);
+
+  // Auto bucket size: aim for ~12 buckets, round to nice number
+  const rawStep = (maxP - minP) / 12;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const niceSteps = [1,2,2.5,5,10].map(f => f*magnitude);
+  const step = niceSteps.find(s => s >= rawStep) || niceSteps[niceSteps.length-1];
+
+  const bucketStart = Math.floor(minP / step) * step;
+  const buckets = [];
+  for (let s = bucketStart; s < maxP + step; s += step) {
+    buckets.push({from: s, to: s + step, count: 0});
+  }
+  for (const p of prices) {
+    const b = buckets.find(b => p >= b.from && p < b.to);
+    if (b) b.count++;
+    else if (p === maxP) buckets[buckets.length-1].count++;
+  }
+  // Remove empty trailing buckets
+  while (buckets.length > 1 && buckets[buckets.length-1].count === 0) buckets.pop();
+
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+  const medBucketIdx = buckets.findIndex(b => medP >= b.from && medP < b.to);
+
+  const fmtPrice = p => p >= 1000 ? `${Math.round(p/100)/10}k` : String(p);
+
+  let html = '';
+  buckets.forEach((b, i) => {
+    const heightPct = (b.count / maxCount) * 85 + 3;
+    const isMedian  = i === medBucketIdx;
+    const countHtml = b.count > 0 ? `<span class="price-hist-count">${b.count}</span>` : '';
+    html += `
+      <div class="price-hist-bar-wrap">
+        <div class="price-hist-bar${isMedian?' median-bar':''}" style="height:${heightPct}%" title="${b.from.toLocaleString('pl-PL')}–${b.to.toLocaleString('pl-PL')} zł: ${b.count} ogłoszeń">
+          ${b.count > 0 ? countHtml : ''}
+        </div>
+        <span class="price-hist-label">${fmtPrice(b.from)}</span>
+      </div>`;
+  });
+  barsEl.innerHTML = html;
+
+  // Stats row
+  const withPrice = listings.length;
+  const noPrice   = (data.current_listings||[]).length - withPrice;
+  const p25 = prices[Math.floor(n*0.25)];
+  const p75 = prices[Math.floor(n*0.75)];
+
+  statsEl.innerHTML = `
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${minP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Min</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--green)">${medP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Mediana</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${avgP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Średnia</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${maxP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Max</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${p25.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Q1 (25%)</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${p75.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Q3 (75%)</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${withPrice}</div><div class="price-hist-stat-lbl">Z ceną</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--text-muted)">${noPrice}</div><div class="price-hist-stat-lbl">Bez ceny</div></div>
+  `;
+
+  metaEl.textContent = `${buckets.length} przedziałów po ${step.toLocaleString('pl-PL')} zł`;
 }
 
 // ─── Line Chart ────────────────────────────────────────────
