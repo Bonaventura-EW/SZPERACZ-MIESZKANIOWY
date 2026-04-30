@@ -1,0 +1,71 @@
+name: SZPERACZ MIESZKANIOWY — Failsafe Check
+
+on:
+  schedule:
+    # Sprawdzaj o 11:00 UTC czy scan już był
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  failsafe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if scan already ran today
+        id: check
+        run: |
+          TODAY=$(date '+%Y-%m-%d')
+          if [ -f "data/dashboard_data.json" ]; then
+            LAST_SCAN=$(python3 -c "
+          import json
+          with open('data/dashboard_data.json') as f:
+              d = json.load(f)
+          print(d.get('last_scan', '')[:10])
+          " 2>/dev/null || echo "")
+            echo "last_scan_date=$LAST_SCAN" >> $GITHUB_OUTPUT
+            echo "today=$TODAY" >> $GITHUB_OUTPUT
+            if [ "$LAST_SCAN" = "$TODAY" ]; then
+              echo "needs_scan=false" >> $GITHUB_OUTPUT
+              echo "✅ Scan already ran today ($LAST_SCAN)"
+            else
+              echo "needs_scan=true" >> $GITHUB_OUTPUT
+              echo "⚠️ No scan today! Last: $LAST_SCAN. Running backup scan..."
+            fi
+          else
+            echo "needs_scan=true" >> $GITHUB_OUTPUT
+            echo "⚠️ No data file found. Running initial scan..."
+          fi
+
+      - name: Set up Python (if needed)
+        if: steps.check.outputs.needs_scan == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies (if needed)
+        if: steps.check.outputs.needs_scan == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Run backup scan
+        if: steps.check.outputs.needs_scan == 'true'
+        run: python main.py --scan
+
+      - name: Commit backup scan data
+        if: steps.check.outputs.needs_scan == 'true'
+        run: |
+          git config user.name "SZPERACZ Bot"
+          git config user.email "szperacz-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "🆘 Backup scan: $(date '+%Y-%m-%d %H:%M') UTC"
+          git push

@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SZPERACZ MIESZKANIOWY — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   SZPERACZ MIESZKANIOWY — CSS (żółto-niebieska kolorystyka)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --font-display: 'JetBrains Mono', monospace;
+  --font-body: 'DM Sans', sans-serif;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0a0d14;
+  --bg-secondary: #10141f;
+  --bg-card: #141928;
+  --bg-card-hover: #1a2035;
+  --bg-accent: #141928;
+  --text-primary: #f0f2f8;
+  --text-secondary: #8b96b0;
+  --text-muted: #525d78;
+  --border: #1e2640;
+  --border-light: #181f33;
+  --accent: #FFD700;
+  --accent-dim: #c9a800;
+  --accent-glow: rgba(255, 215, 0, 0.12);
+  --accent-bg: rgba(255, 215, 0, 0.07);
+  --blue: #1A3A6B;
+  --blue-light: #2a5aaa;
+  --green: #10b981;
+  --green-bg: rgba(16, 185, 129, 0.1);
+  --red: #ef4444;
+  --red-bg: rgba(239, 68, 68, 0.1);
+  --chart-bar: #FFD700;
+  --chart-bar-hover: #ffe452;
+  --chart-line: #2a5aaa;
+  --scrollbar-bg: #10141f;
+  --scrollbar-thumb: #1e2640;
+  --modal-bg: rgba(0,0,0,0.75);
+  --shadow: 0 4px 32px rgba(0,0,0,0.5);
+  --shadow-accent: 0 4px 20px rgba(255,215,0,0.15);
+}
+
+[data-theme="light"] {
+  --bg-primary: #f0f3fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8faff;
+  --bg-accent: #fffbeb;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --accent: #d4a000;
+  --accent-dim: #b38600;
+  --accent-glow: rgba(212,160,0,0.1);
+  --accent-bg: rgba(212,160,0,0.06);
+  --blue: #1A3A6B;
+  --blue-light: #2a5aaa;
+  --green: #059669;
+  --green-bg: rgba(5, 150, 105, 0.08);
+  --red: #dc2626;
+  --red-bg: rgba(220, 38, 38, 0.08);
+  --chart-bar: #d4a000;
+  --chart-bar-hover: #f0b800;
+  --chart-line: #1A3A6B;
+  --scrollbar-bg: #f0f3fa;
+  --scrollbar-thumb: #cbd5e1;
+  --modal-bg: rgba(0,0,0,0.45);
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-accent: 0 4px 20px rgba(212,160,0,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-bg); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+/* ─── Top Bar ─── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.topbar-left { display: flex; align-items: center; gap: 14px; }
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.logo-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+/* ─── Scan Button ─── */
+.btn-scan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  background: var(--accent);
+  color: var(--blue);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-accent);
+}
+
+.btn-scan:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-scan:active { transform: translateY(0); }
+.btn-scan.scanning { opacity: 0.75; pointer-events: none; }
+
+.btn-scan.scanning::after {
+  content: '';
+  position: absolute;
+  left: -100%;
+  top: 0;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+/* ─── Theme Toggle ─── */
+.btn-theme {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  transition: all var(--transition);
+}
+
+.btn-theme:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ─── Scan Info Bar ─── */
+.scan-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  padding: 10px 28px;
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.scan-info-item { display: flex; align-items: center; gap: 8px; }
+.scan-info-item .label { color: var(--text-muted); }
+.scan-info-item .value { color: var(--text-primary); font-weight: 600; }
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+  box-shadow: 0 0 6px var(--accent);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ─── Main Container ─── */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 28px;
+}
+
+/* ─── Hero Card — single profile ─── */
+.hero-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--blue-light));
+}
+
+.hero-card::after {
+  content: '';
+  position: absolute;
+  bottom: -60px;
+  right: -60px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-accent);
+  transform: translateY(-2px);
+}
+
+.hero-card.active {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-accent);
+}
+
+.hero-icon {
+  font-size: 52px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.hero-info { flex: 1; }
+
+.hero-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
+.hero-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.hero-url {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+}
+
+.hero-stats {
+  display: flex;
+  gap: 40px;
+  flex-shrink: 0;
+}
+
+.hero-stat { text-align: center; }
+
+.hero-stat-value {
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  display: block;
+}
+
+.hero-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.badge-up { background: var(--green-bg); color: var(--green); }
+.badge-down { background: var(--red-bg); color: var(--red); }
+.badge-same { background: var(--accent-bg); color: var(--text-muted); }
+
+/* ─── Detail Panel ─── */
+.detail-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 32px;
+  overflow: hidden;
+  display: none;
+  animation: slideDown 0.3s ease;
+}
+
+.detail-panel.visible { display: block; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-bg);
+}
+
+.detail-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.detail-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all var(--transition);
+}
+
+.detail-close:hover { border-color: var(--red); color: var(--red); }
+
+/* ─── Stats Grid ─── */
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: var(--border);
+}
+
+.detail-stat {
+  background: var(--bg-card);
+  padding: 18px 20px;
+  text-align: center;
+  transition: background var(--transition);
+}
+
+.detail-stat:hover { background: var(--bg-accent); }
+
+.detail-stat-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.detail-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Chart ─── */
+.chart-section {
+  padding: 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.range-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-primary);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.range-tab {
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all var(--transition);
+}
+
+.range-tab.active {
+  background: var(--accent);
+  color: var(--blue);
+}
+
+.range-tab:hover:not(.active) { color: var(--text-primary); }
+
+.chart-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 180px;
+  padding: 24px 4px 0;
+  position: relative;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.chart-bar {
+  width: 100%;
+  max-width: 52px;
+  background: var(--chart-bar);
+  border-radius: 4px 4px 0 0;
+  transition: all var(--transition);
+  position: relative;
+  min-height: 4px;
+  opacity: 0.85;
+}
+
+.chart-bar:hover { opacity: 1; background: var(--chart-bar-hover); }
+
+.chart-bar-value {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.chart-bar-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* ─── Listings ─── */
+.listings-section { padding: 28px; }
+
+.listings-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.listings-tabs { display: flex; gap: 4px; }
+
+.listing-tab {
+  padding: 7px 16px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+}
+
+.listing-tab:hover { color: var(--text-primary); }
+.listing-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.listings-count {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.listings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.listings-table th {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.listings-table th:hover { color: var(--accent); }
+.listings-table th.sorted { color: var(--accent); }
+
+.listings-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.listings-table tr:hover td { background: var(--accent-bg); }
+
+.listing-title a {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition);
+}
+
+.listing-title a:hover { color: var(--accent); }
+
+.price-tag {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.price-change {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.price-change.up { color: var(--red); }
+.price-change.down { color: var(--green); }
+
+.date-cell {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.new-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  background: var(--accent);
+  color: var(--blue);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  margin-left: 6px;
+}
+
+/* ─── Scan Modal ─── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--modal-bg);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal-overlay.visible { display: flex; }
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 460px;
+  width: 90%;
+  box-shadow: var(--shadow);
+}
+
+.modal-icon { font-size: 32px; margin-bottom: 12px; }
+
+.modal h3 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+.modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6; }
+
+.modal input[type="text"] {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  margin-bottom: 12px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.modal input[type="text"]:focus { border-color: var(--accent); }
+
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+
+.modal-checkbox input { accent-color: var(--accent); }
+
+.modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+
+.btn-modal {
+  padding: 9px 22px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all var(--transition);
+}
+
+.btn-cancel { background: none; color: var(--text-secondary); }
+.btn-cancel:hover { border-color: var(--text-secondary); }
+.btn-confirm { background: var(--accent); color: var(--blue); border-color: var(--accent); }
+.btn-confirm:hover { filter: brightness(1.08); }
+
+/* ─── Toast ─── */
+.status-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 300;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.4s ease;
+  max-width: 360px;
+}
+
+.status-toast.visible { transform: translateY(0); opacity: 1; }
+.status-toast.success { background: var(--green); color: #fff; }
+.status-toast.error { background: var(--red); color: #fff; }
+.status-toast.info { background: var(--accent); color: var(--blue); }
+
+/* ─── Empty State ─── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state-icon { font-size: 56px; margin-bottom: 16px; }
+.empty-state p { font-size: 14px; line-height: 1.7; }
+
+/* ─── Footer ─── */
+.footer {
+  text-align: center;
+  padding: 24px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+  font-family: var(--font-display);
+}
+
+.footer a { color: var(--accent); text-decoration: none; }
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .topbar { padding: 10px 16px; }
+  .container { padding: 16px; }
+  .hero-card { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .hero-stats { gap: 24px; }
+  .hero-stat-value { font-size: 32px; }
+  .scan-info { flex-wrap: wrap; gap: 16px; padding: 8px 16px; }
+  .detail-stats { grid-template-columns: repeat(2, 1fr); }
+  .chart-container { height: 140px; }
+  .listings-section { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Top Bar ═══ -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div>
+      <div class="logo">🏠 SZPERACZ</div>
+      <div class="logo-sub">Mieszkaniowy · Lublin</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-scan" id="btnScan" onclick="openScanModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Scan teraz
+    </button>
+    <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" title="Przełącz motyw">🌙</button>
+  </div>
+</header>
+
+<!-- ═══ Scan Info Bar ═══ -->
+<div class="scan-info">
+  <div class="scan-info-item">
+    <div class="live-dot"></div>
+    <span class="label">Ostatni scan:</span>
+    <span class="value" id="lastScanTime">—</span>
+  </div>
+  <div class="scan-info-item">
+    <span class="label">Następny scan:</span>
+    <span class="value" id="nextScanTime">—</span>
+  </div>
+  <div class="scan-info-item">
+    <span class="label">Do następnego:</span>
+    <span class="value" id="timeToNext">—</span>
+  </div>
+</div>
+
+<!-- ═══ Main Content ═══ -->
+<main class="container">
+
+  <!-- Hero Card (single profile) -->
+  <div id="heroCard" class="hero-card" onclick="toggleDetail()">
+    <div class="hero-icon">🏠</div>
+    <div class="hero-info">
+      <div class="hero-label">Monitorowany rynek</div>
+      <div class="hero-name" id="heroName">—</div>
+      <div class="hero-url">olx.pl/nieruchomosci/mieszkania/wynajem/lublin/</div>
+      <div id="heroBadge"></div>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="heroCount">—</span>
+        <span class="hero-stat-label">ogłoszeń</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="heroNew" style="font-size:28px; color: var(--green);">—</span>
+        <span class="hero-stat-label">nowe (24h)</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="heroAvg" style="font-size:28px; color: var(--text-secondary);">—</span>
+        <span class="hero-stat-label">śr. cena (zł)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <div class="detail-title" id="detailTitle">Szczegóły</div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-stats" id="detailStats"></div>
+    <div class="chart-section">
+      <div class="chart-header">
+        <div class="chart-title">Liczba ogłoszeń</div>
+        <div class="range-tabs">
+          <button class="range-tab" onclick="setRange(7, this)">7 dni</button>
+          <button class="range-tab active" onclick="setRange(14, this)">14 dni</button>
+          <button class="range-tab" onclick="setRange(30, this)">30 dni</button>
+        </div>
+      </div>
+      <div class="chart-container" id="chartContainer"></div>
+    </div>
+    <div class="listings-section">
+      <div class="listings-toolbar">
+        <div class="listings-tabs">
+          <button class="listing-tab active" onclick="switchTab('current', this)">Aktualne</button>
+          <button class="listing-tab" onclick="switchTab('archived', this)">Archiwum</button>
+        </div>
+        <div class="listings-count" id="listingsCount"></div>
+      </div>
+      <div id="listingsContent"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══ Scan Modal ═══ -->
+<div class="modal-overlay" id="scanModal">
+  <div class="modal">
+    <div class="modal-icon">🔑</div>
+    <h3>Uruchom scan OLX</h3>
+    <p>Podaj GitHub Personal Access Token (PAT) z uprawnieniem <strong>Actions: write</strong>.</p>
+    <p style="font-size:12px;">
+      <a href="https://github.com/settings/tokens/new?scopes=repo&description=SZPERACZ+MIESZKANIOWY" target="_blank" style="color:var(--accent)">Utwórz token →</a>
+      (zakres: <code>repo</code> lub <code>workflow</code>)
+    </p>
+    <input type="text" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    <label class="modal-checkbox">
+      <input type="checkbox" id="rememberToken"> Zapamiętaj token w przeglądarce
+    </label>
+    <div class="modal-buttons">
+      <button class="btn-modal btn-cancel" onclick="closeScanModal()">Anuluj</button>
+      <button class="btn-modal btn-confirm" onclick="triggerScan()">▶ Uruchom</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Toast ═══ -->
+<div class="status-toast" id="toast"></div>
+
+<!-- ═══ Footer ═══ -->
+<div class="footer">
+  SZPERACZ MIESZKANIOWY &copy; 2026 &nbsp;·&nbsp;
+  <a href="https://github.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY" target="_blank">GitHub</a>
+  &nbsp;·&nbsp;
+  <a href="https://www.olx.pl/nieruchomosci/mieszkania/wynajem/lublin/" target="_blank">OLX Lublin</a>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   SZPERACZ MIESZKANIOWY — JavaScript
+   ═══════════════════════════════════════════════════════════ */
+
+const GITHUB_OWNER = 'Bonaventura-EW';
+const GITHUB_REPO = 'SZPERACZ-MIESZKANIOWY';
+const DATA_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/data/dashboard_data.json`;
+const WORKFLOW_FILE = 'scan.yml';
+
+let dashData = null;
+let detailOpen = false;
+let currentTab = 'current';
+let chartRange = 14;
+let sortCol = null;
+let sortAsc = true;
+
+// ─── Data Loading ──────────────────────────────────────────
+
+async function loadData() {
+  try {
+    const resp = await fetch(DATA_URL + `?t=${Date.now()}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    dashData = await resp.json();
+    renderAll();
+  } catch (e) {
+    console.error('Failed to load data:', e);
+    document.getElementById('heroCard').innerHTML = `
+      <div class="hero-icon">📡</div>
+      <div class="hero-info">
+        <div class="hero-label">Brak danych</div>
+        <div class="hero-name">Uruchom pierwszy scan przyciskiem powyżej</div>
+        <div class="hero-url">olx.pl/nieruchomosci/mieszkania/wynajem/lublin/</div>
+      </div>
+    `;
+  }
+}
+
+// ─── Render All ────────────────────────────────────────────
+
+function renderAll() {
+  if (!dashData) return;
+  renderScanInfo();
+  renderHeroCard();
+  if (detailOpen) renderDetail();
+}
+
+// ─── Scan Info Bar ─────────────────────────────────────────
+
+function renderScanInfo() {
+  const lastScan = dashData.last_scan;
+  if (!lastScan) return;
+
+  const d = new Date(lastScan.replace(' ', 'T'));
+  document.getElementById('lastScanTime').textContent = formatDateTime(d);
+
+  const now = new Date();
+  let next = new Date(now);
+  next.setHours(9, 0, 0, 0);
+  if (now >= next) next.setDate(next.getDate() + 1);
+
+  document.getElementById('nextScanTime').textContent = formatDateTime(next);
+  updateCountdown(next);
+  setInterval(() => updateCountdown(next), 60000);
+}
+
+function updateCountdown(target) {
+  const diff = target - new Date();
+  if (diff <= 0) return;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  document.getElementById('timeToNext').textContent = `${h}h ${m}min`;
+}
+
+function formatDateTime(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ─── Hero Card ─────────────────────────────────────────────
+
+function renderHeroCard() {
+  const profiles = dashData.profiles || {};
+  const keys = Object.keys(profiles);
+  if (!keys.length) return;
+
+  const key = keys[0];
+  const data = profiles[key];
+  const counts = data.daily_counts || [];
+  const latest = counts[counts.length - 1] || {};
+  const count = latest.count || 0;
+  const change = latest.change || 0;
+
+  const listings = data.current_listings || [];
+  const prices = listings.map(l => l.price).filter(p => p > 0);
+  const avg = prices.length ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : 0;
+
+  const now = Date.now();
+  const newCount = listings.filter(l => {
+    if (!l.first_seen) return false;
+    return (now - new Date(l.first_seen.replace(' ', 'T'))) < 86400000;
+  }).length;
+
+  document.getElementById('heroName').textContent = data.label || key;
+  document.getElementById('heroCount').textContent = count;
+  document.getElementById('heroNew').textContent = newCount;
+  document.getElementById('heroAvg').textContent = avg ? avg.toLocaleString('pl-PL') : '—';
+
+  let badgeClass = 'badge-same', badgeText = '= bez zmian';
+  if (change > 0) { badgeClass = 'badge-up'; badgeText = `↑ +${change} ogłoszeń`; }
+  else if (change < 0) { badgeClass = 'badge-down'; badgeText = `↓ ${change} ogłoszeń`; }
+
+  document.getElementById('heroBadge').innerHTML = `<span class="hero-badge ${badgeClass}">${badgeText}</span>`;
+
+  if (detailOpen) document.getElementById('heroCard').classList.add('active');
+  else document.getElementById('heroCard').classList.remove('active');
+}
+
+// ─── Detail Panel ──────────────────────────────────────────
+
+function toggleDetail() {
+  detailOpen = !detailOpen;
+  const panel = document.getElementById('detailPanel');
+  if (detailOpen) {
+    panel.classList.add('visible');
+    renderDetail();
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    panel.classList.remove('visible');
+  }
+  renderHeroCard();
+}
+
+function closeDetail() {
+  detailOpen = false;
+  document.getElementById('detailPanel').classList.remove('visible');
+  renderHeroCard();
+}
+
+function renderDetail() {
+  const profiles = dashData.profiles || {};
+  const keys = Object.keys(profiles);
+  if (!keys.length) return;
+  const key = keys[0];
+  const data = profiles[key];
+
+  document.getElementById('detailTitle').textContent = data.label || key;
+
+  const listings = data.current_listings || [];
+  const archived = data.archived_listings || [];
+  const counts = data.daily_counts || [];
+  const latest = counts[counts.length - 1] || {};
+
+  const prices = listings.map(l => l.price).filter(p => p > 0);
+  const avg = prices.length ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : 0;
+  const minP = prices.length ? Math.min(...prices) : 0;
+  const maxP = prices.length ? Math.max(...prices) : 0;
+  const now = Date.now();
+  const newCount = listings.filter(l => l.first_seen && (now - new Date(l.first_seen.replace(' ', 'T'))) < 86400000).length;
+  const priceChanges = listings.filter(l => l.price_change).length;
+
+  document.getElementById('detailStats').innerHTML = `
+    <div class="detail-stat">
+      <div class="detail-stat-value">${latest.count || 0}</div>
+      <div class="detail-stat-label">Aktywne</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value" style="color:${(latest.change||0) > 0 ? 'var(--green)' : (latest.change||0) < 0 ? 'var(--red)' : 'inherit'}">${(latest.change||0) > 0 ? '+' : ''}${latest.change || 0}</div>
+      <div class="detail-stat-label">Zmiana</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value" style="color:var(--green)">${newCount}</div>
+      <div class="detail-stat-label">Nowe (24h)</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value">${avg ? avg.toLocaleString('pl-PL') : '—'} <span style="font-size:14px">zł</span></div>
+      <div class="detail-stat-label">Śr. cena</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value">${minP ? minP.toLocaleString('pl-PL') : '—'} <span style="font-size:14px">zł</span></div>
+      <div class="detail-stat-label">Min cena</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value">${maxP ? maxP.toLocaleString('pl-PL') : '—'} <span style="font-size:14px">zł</span></div>
+      <div class="detail-stat-label">Max cena</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value">${archived.length}</div>
+      <div class="detail-stat-label">Archiwum</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-value" style="color:var(--red)">${priceChanges}</div>
+      <div class="detail-stat-label">Zmiany cen</div>
+    </div>
+  `;
+
+  renderChart();
+  renderListings(currentTab);
+}
+
+// ─── Chart ─────────────────────────────────────────────────
+
+function setRange(days, btn) {
+  chartRange = days;
+  document.querySelectorAll('.range-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+}
+
+function renderChart() {
+  const profiles = dashData.profiles || {};
+  const key = Object.keys(profiles)[0];
+  if (!key) return;
+  const counts = profiles[key].daily_counts || [];
+  const slice = counts.slice(-chartRange);
+
+  if (!slice.length) {
+    document.getElementById('chartContainer').innerHTML = `<div style="width:100%;text-align:center;color:var(--text-muted);padding:50px 0;font-family:var(--font-display);font-size:13px;">Brak danych</div>`;
+    return;
+  }
+
+  const vals = slice.map(d => d.count);
+  const minVal = Math.min(...vals);
+  const maxVal = Math.max(...vals, minVal + 1);
+  const range = maxVal - minVal || 1;
+
+  let html = '';
+  for (const entry of slice) {
+    const heightPct = ((entry.count - minVal) / range) * 85 + 10;
+    const [,mm,dd] = entry.date.split('-');
+    html += `
+      <div class="chart-bar-wrapper">
+        <div class="chart-bar" style="height:${heightPct}%" title="${entry.date}: ${entry.count} ogłoszeń">
+          <span class="chart-bar-value">${entry.count}</span>
+        </div>
+        <span class="chart-bar-label">${dd}.${mm}</span>
+      </div>
+    `;
+  }
+  document.getElementById('chartContainer').innerHTML = html;
+}
+
+// ─── Listings Table ─────────────────────────────────────────
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  sortCol = null;
+  document.querySelectorAll('.listing-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderListings(tab);
+}
+
+function renderListings(tab) {
+  const profiles = dashData.profiles || {};
+  const key = Object.keys(profiles)[0];
+  if (!key) return;
+  const data = profiles[key];
+  const raw = tab === 'current' ? (data.current_listings || []) : (data.archived_listings || []);
+
+  document.getElementById('listingsCount').textContent = `${raw.length} ogłoszeń`;
+
+  if (!raw.length) {
+    document.getElementById('listingsContent').innerHTML = `
+      <div style="text-align:center;padding:50px;color:var(--text-muted);font-family:var(--font-display);font-size:13px;">
+        ${tab === 'current' ? '🏠 Brak aktualnych ogłoszeń — uruchom scan' : '📦 Brak archiwalnych ogłoszeń'}
+      </div>
+    `;
+    return;
+  }
+
+  let sorted = [...raw].sort((a,b) => {
+    const da = a.first_seen || a.archived_date || '';
+    const db = b.first_seen || b.archived_date || '';
+    return db.localeCompare(da);
+  });
+
+  if (sortCol) {
+    sorted.sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (va == null) va = '';
+      if (vb == null) vb = '';
+      if (typeof va === 'number' && typeof vb === 'number') return sortAsc ? va - vb : vb - va;
+      return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+  }
+
+  const now = Date.now();
+
+  const thSort = (col, label) => {
+    const arrow = sortCol === col ? (sortAsc ? ' ↑' : ' ↓') : '';
+    const cls = sortCol === col ? 'sorted' : '';
+    return `<th class="${cls}" onclick="doSort('${col}')">${label}${arrow}</th>`;
+  };
+
+  let html = `
+    <table class="listings-table">
+      <thead><tr>
+        ${thSort('title', 'Ogłoszenie')}
+        ${thSort('price', 'Cena')}
+        ${thSort('price_change', 'Zmiana ceny')}
+        ${thSort('published', 'Data publ.')}
+        ${thSort('refreshed', 'Odświeżone')}
+        ${tab === 'archived' ? '<th>Zniknęło</th>' : ''}
+      </tr></thead>
+      <tbody>
+  `;
+
+  for (const l of sorted) {
+    const price = l.price ? `${l.price.toLocaleString('pl-PL')} zł` : '—';
+    let pcHtml = '<span class="price-change">—</span>';
+    if (l.price_change > 0) pcHtml = `<span class="price-change up">+${l.price_change} zł</span>`;
+    else if (l.price_change < 0) pcHtml = `<span class="price-change down">${l.price_change} zł</span>`;
+
+    const isNew = l.first_seen && (now - new Date(l.first_seen.replace(' ', 'T'))) < 86400000;
+    const newBadge = isNew && tab === 'current' ? '<span class="new-badge">NOWE</span>' : '';
+
+    const archived = l.archived_date ? l.archived_date.split(' ')[0] : '—';
+
+    html += `
+      <tr>
+        <td class="listing-title"><a href="${esc(l.url||'#')}" target="_blank">${esc(l.title||'—')}</a>${newBadge}</td>
+        <td><span class="price-tag">${price}</span></td>
+        <td>${pcHtml}</td>
+        <td class="date-cell">${l.published || '—'}</td>
+        <td class="date-cell">${l.refreshed || '—'}</td>
+        ${tab === 'archived' ? `<td class="date-cell">${archived}</td>` : ''}
+      </tr>
+    `;
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('listingsContent').innerHTML = html;
+}
+
+function doSort(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  renderListings(currentTab);
+}
+
+// ─── Theme ─────────────────────────────────────────────────
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  document.getElementById('btnTheme').textContent = next === 'dark' ? '🌙' : '☀️';
+  localStorage.setItem('szperacz-mieszkaniowy-theme', next);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('szperacz-mieszkaniowy-theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    document.getElementById('btnTheme').textContent = saved === 'dark' ? '🌙' : '☀️';
+  }
+}
+
+// ─── Scan Modal ─────────────────────────────────────────────
+
+function openScanModal() {
+  document.getElementById('scanModal').classList.add('visible');
+  const saved = localStorage.getItem('szperacz-mieszkaniowy-token');
+  if (saved) {
+    document.getElementById('ghToken').value = saved;
+    document.getElementById('rememberToken').checked = true;
+  }
+}
+
+function closeScanModal() {
+  document.getElementById('scanModal').classList.remove('visible');
+}
+
+async function triggerScan() {
+  const token = document.getElementById('ghToken').value.trim();
+  if (!token) { showToast('Podaj token GitHub', 'error'); return; }
+
+  if (document.getElementById('rememberToken').checked)
+    localStorage.setItem('szperacz-mieszkaniowy-token', token);
+  else
+    localStorage.removeItem('szperacz-mieszkaniowy-token');
+
+  const btn = document.getElementById('btnScan');
+  btn.classList.add('scanning');
+  btn.textContent = '⏳ Skanowanie...';
+  closeScanModal();
+
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main' }),
+      }
+    );
+
+    if (resp.status === 204) {
+      showToast('✅ Scan uruchomiony! Dane zaktualizują się za ~2-3 min.', 'success');
+      document.getElementById('lastScanTime').textContent = formatDateTime(new Date()) + ' (w toku)';
+      setTimeout(() => { loadData(); showToast('📊 Dane odświeżone', 'info'); }, 180000);
+    } else if (resp.status === 401 || resp.status === 403) {
+      showToast('❌ Błąd autoryzacji — sprawdź token', 'error');
+    } else {
+      showToast(`Błąd: HTTP ${resp.status}`, 'error');
+    }
+  } catch (e) {
+    showToast(`Błąd: ${e.message}`, 'error');
+  }
+
+  btn.classList.remove('scanning');
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Scan teraz`;
+}
+
+// ─── Toast ──────────────────────────────────────────────────
+
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `status-toast ${type} visible`;
+  setTimeout(() => t.classList.remove('visible'), 5000);
+}
+
+// ─── Utils ──────────────────────────────────────────────────
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ─── Init ───────────────────────────────────────────────────
+
+initTheme();
+loadData();
+setInterval(loadData, 300000);
+</script>
+
+</body>
+</html>
