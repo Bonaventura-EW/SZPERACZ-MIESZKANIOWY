@@ -46,16 +46,25 @@ USER_AGENTS = [
 # ─── HTTP Session ────────────────────────────────────────────────────────────
 
 def get_session():
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
     s = requests.Session()
     ua = random.choice(USER_AGENTS)
     s.headers.update({
         "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pl-PL,pl;q=0.9",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     })
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
     return s
 
 
