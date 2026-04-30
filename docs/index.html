@@ -248,13 +248,36 @@ input[type=range].day-slider::-moz-range-thumb{
 
 /* ─── Responsive ─── */
 @media(max-width:768px){
-  .topbar{padding:10px 16px;}
-  .container{padding:14px;}
-  .hero-card{flex-direction:column;align-items:flex-start;gap:18px;}
-  .hero-stats{gap:20px;}
-  .hero-stat-value{font-size:30px;}
-  .scan-info{flex-wrap:wrap;gap:14px;padding:8px 16px;}
+  .topbar{padding:10px 14px;}
+  .logo{font-size:15px;}
+  .logo-sub{font-size:10px;}
+  .btn-scan{padding:8px 14px;font-size:12px;}
+  .container{padding:10px;}
+  .hero-card{flex-direction:column;align-items:flex-start;gap:14px;padding:18px 16px;}
+  .hero-stats{gap:16px;width:100%;justify-content:space-between;}
+  .hero-stat-value{font-size:28px;}
+  .hero-name{font-size:16px;}
+  .scan-info{flex-direction:column;align-items:flex-start;gap:6px;padding:8px 14px;}
+  .scan-info-item{font-size:11px;}
   .detail-stats{grid-template-columns:repeat(2,1fr);}
+  .detail-header{padding:14px 16px;}
+  .price-hist-section{padding:14px;}
+  .line-chart-section{padding:14px;}
+  .listings-section{padding:14px;}
+  .metric-tabs{gap:4px;}
+  .metric-tab{padding:5px 8px;font-size:10px;}
+  .modal{padding:22px 18px;}
+  /* Mobile-friendly card table instead of wide table */
+  .listings-table{min-width:unset;}
+  .listings-table thead{display:none;}
+  .listings-table tr{display:block;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;padding:10px 12px;background:var(--bg-card);}
+  .listings-table td{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border:none;font-size:12px;}
+  .listings-table td::before{content:attr(data-label);font-family:var(--font-display);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;flex-shrink:0;margin-right:8px;}
+  .listings-table td.listing-title{display:block;font-size:13px;font-weight:600;padding-bottom:8px;border-bottom:1px solid var(--border-light);margin-bottom:4px;}
+  .listings-table td.listing-title::before{display:none;}
+  .listings-table td[data-hide-mobile]{display:none;}
+  .line-chart-canvas-wrapper{height:180px;}
+  .price-hist-bars{height:130px;}
 }
 </style>
 </head>
@@ -944,17 +967,17 @@ function renderListings(tab) {
 
     html += `<tr>
       <td class="listing-title"><a href="${esc(l.url||'#')}" target="_blank">${esc(l.title||'—')}</a>${newBadge}${refreshIcon}</td>
-      <td><span class="price-tag">${price}</span></td>
-      <td style="text-align:center">${promoStar}</td>
-      <td style="text-align:center">${promoDays}</td>
-      <td style="text-align:center">${promoSess}</td>
-      <td>${pcHtml}</td>
-      <td class="date-cell">${l.published||'—'}</td>
-      <td class="date-cell">${l.refreshed||'—'}</td>
-      <td style="text-align:center">${refreshCnt}</td>
-      <td style="text-align:center">${reactCnt}</td>
-      <td style="text-align:center">${daysStr}</td>
-      ${tab==='archived' ? `<td class="date-cell">${archived}</td>` : ''}
+      <td data-label="Cena"><span class="price-tag">${price}</span></td>
+      <td data-label="Promo" style="text-align:center">${promoStar}</td>
+      <td data-label="Dni prom." data-hide-mobile style="text-align:center">${promoDays}</td>
+      <td data-label="Sesje" data-hide-mobile style="text-align:center">${promoSess}</td>
+      <td data-label="Zm. ceny">${pcHtml}</td>
+      <td data-label="Publ." class="date-cell">${l.published||'—'}</td>
+      <td data-label="Odśw." data-hide-mobile class="date-cell">${l.refreshed||'—'}</td>
+      <td data-label="Odsw." data-hide-mobile style="text-align:center">${refreshCnt}</td>
+      <td data-label="Reakt." data-hide-mobile style="text-align:center">${reactCnt}</td>
+      <td data-label="Aktywne" style="text-align:center">${daysStr}</td>
+      ${tab==='archived' ? `<td data-label="Zniknęło" class="date-cell">${archived}</td>` : ''}
     </tr>`;
   }
   html += '</tbody></table>';
