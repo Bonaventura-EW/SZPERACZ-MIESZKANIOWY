@@ -33,11 +33,12 @@ EXCEL_PATH = os.path.join(DATA_DIR, "szperacz_mieszkaniowy.xlsx")
 JSON_PATH  = os.path.join(DATA_DIR, "dashboard_data.json")
 
 USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
 ]
 
 # ─── HTTP Session ────────────────────────────────────────────────────────────
@@ -48,10 +49,14 @@ def get_session():
     s = requests.Session()
     s.headers.update({
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "pl-PL,pl;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
     })
     retry = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
     adapter = HTTPAdapter(max_retries=retry)
@@ -106,35 +111,69 @@ def extract_listing_id(url):
 # ─── Promoted Detection ───────────────────────────────────────────────────────
 
 def detect_promoted_status(card):
+    """
+    Wykrywa promowane ogłoszenia OLX.
+    Priorytet sygnałów (od najsilniejszego):
+      1. URL zawiera search_reason=search%7Cpromoted  (pewne)
+      2. data-testid="adCard-featured" / "listing-ad-badge"  (pewne gdy obecne)
+      3. data-promoted / data-featured atrybut na karcie
+      4. Tekst badge: Wyróżnione / Promowane / TOP / Pilne / Premium
+      5. Klasa CSS: featured / promoted / top-ad / premium / vip
+    """
     signals = []
+
+    # Sygnał 1: URL z parametrem promoted (działa na OLX 2025)
     for link in card.select('a[href*="/d/oferta/"]'):
         href = link.get('href', '')
-        if 'search_reason=search%7Cpromoted' in href or ('promoted' in href.lower() and '/d/oferta/' in href):
-            signals.append(('url_parameter', 1.0))
+        if 'search_reason=search%7Cpromoted' in href or 'reason=promoted' in href:
+            signals.append(('url_promoted', 1.0))
             break
+        if 'promoted' in href.lower() and '/d/oferta/' in href and 'search_reason' not in href:
+            signals.append(('url_keyword', 0.85))
+            break
+
+    # Sygnał 2: data-testid badges
     if card.select_one('[data-testid="adCard-featured"]'):
         signals.append(('featured_badge', 1.0))
     if card.select_one('[data-testid="listing-ad-badge"]'):
-        signals.append(('ad_badge', 0.9))
-    element_classes = ' '.join(card.get('class', [])).lower()
-    if any(kw in element_classes for kw in ['featured','promoted','highlighted','top-ad','premium','vip']):
-        signals.append(('css_class', 0.8))
-    if any(b in card.get_text() for b in ['Wyróżnione','Promowane','Premium','TOP','Pilne']):
-        signals.append(('text_badge', 0.85))
-    if card.get('data-promoted') or card.get('data-featured'):
+        signals.append(('ad_badge', 0.95))
+    # Nowy OLX 2025 — sprawdź też inne testid
+    for testid in ['adCard-promoted', 'adCard-top', 'ad-badge', 'badge-promoted']:
+        if card.select_one(f'[data-testid="{testid}"]'):
+            signals.append((f'testid_{testid}', 0.95))
+
+    # Sygnał 3: data atrybuty na karcie
+    if card.get('data-promoted') or card.get('data-featured') or card.get('data-cy-promoted'):
         signals.append(('data_attribute', 1.0))
+
+    # Sygnał 4: tekst badge (szukaj w małych elementach, nie w całej karcie)
+    badge_texts = ['Wyróżnione', 'Promowane', 'Premium', 'TOP ogłoszenie', 'Pilne', 'Sponsorowane']
+    for el in card.select('span, div, p, strong'):
+        txt = el.get_text(strip=True)
+        if txt in badge_texts:
+            signals.append(('text_badge', 0.90))
+            break
+
+    # Sygnał 5: klasy CSS
+    element_classes = ' '.join(card.get('class', [])).lower()
+    if any(kw in element_classes for kw in ['featured', 'promoted', 'top-ad', 'premium', 'vip', 'highlighted']):
+        signals.append(('css_class', 0.80))
+
     if not signals:
         return {'is_promoted': False, 'promotion_type': None, 'confidence': 1.0}
+
     max_conf = max(s[1] for s in signals)
     types = [s[0] for s in signals]
-    if 'url_parameter' in types or 'featured_badge' in types or 'data_attribute' in types:
+
+    if any(t in types for t in ['url_promoted', 'featured_badge', 'data_attribute']):
         promo_type = 'featured'
-    elif 'ad_badge' in types:
+    elif 'ad_badge' in types or any(t.startswith('testid_') for t in types):
         promo_type = 'top_ad'
-    elif 'text_badge' in types or 'css_class' in types:
+    elif 'url_keyword' in types or 'text_badge' in types:
         promo_type = 'highlight'
     else:
-        promo_type = 'unknown'
+        promo_type = 'css_promoted'
+
     return {'is_promoted': True, 'promotion_type': promo_type, 'confidence': max_conf}
 
 # ─── Card Parsing ─────────────────────────────────────────────────────────────
@@ -286,7 +325,9 @@ def scrape_with_crosscheck(profile_key, profile_config):
     log.info(f"[SCAN] Crosscheck: {profile_key}")
     r1 = scrape_profile(profile_key, profile_config, get_session())
     scraped, header = r1["count"], r1["header_count"]
-    tolerance = 10 if profile_config.get("is_category") else 0
+    # OLX miesza ~38% kart Otodom w wynikach kategorii — tolerancja musi to uwzględniać.
+    # Dla kategorii: do 50% różnicy to normalne zachowanie OLX.
+    tolerance = int(header_count * 0.50) if (profile_config.get("is_category") and header_count) else 10
     if header is None or abs(scraped - header) <= tolerance:
         log.info(f"[CROSSCHECK] {profile_key}: PASS (scraped={scraped}, header={header})")
         r1["crosscheck"] = "passed"
