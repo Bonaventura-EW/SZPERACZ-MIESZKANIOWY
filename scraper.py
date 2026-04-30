@@ -517,6 +517,9 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             }
 
         pd_ = data["profiles"][pk]
+        # Backward-compat: ensure promotion_history exists
+        if "promotion_history" not in pd_:
+            pd_["promotion_history"] = {}
         dc  = pd_["daily_counts"]
 
         crosscheck   = result.get("crosscheck","")
