@@ -1,0 +1,13 @@
+{
+  "status": "pending",
+  "timestamp": null,
+  "timestamp_local": null,
+  "duration_seconds": null,
+  "listings_total": null,
+  "listings_new": null,
+  "listings_removed": null,
+  "scan_number": 0,
+  "crosscheck": null,
+  "error": null,
+  "error_detail": null
+}
