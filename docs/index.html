@@ -119,23 +119,60 @@ body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-
 
 /* ─── Price histogram ─── */
 .price-hist-section{padding:24px;border-bottom:1px solid var(--border);}
-.price-hist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.price-hist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
 .price-hist-title{font-family:var(--font-display);font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.7px;}
-.price-hist-meta{font-family:var(--font-display);font-size:11px;color:var(--text-muted);}
-.price-hist-bars{display:flex;align-items:flex-end;gap:4px;height:160px;padding:24px 4px 0;position:relative;}
-.price-hist-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
-.price-hist-bar{width:100%;background:var(--accent);border-radius:4px 4px 0 0;transition:all var(--transition);position:relative;min-height:3px;opacity:0.85;cursor:pointer;}
-.price-hist-bar:hover{opacity:1;background:var(--chart-bar-hover);}
+.price-hist-day-label{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--accent);}
+
+/* Slider */
+.price-hist-slider-wrap{margin-bottom:20px;}
+.price-hist-slider-track{position:relative;padding:0 4px;}
+input[type=range].day-slider{
+  width:100%;height:4px;
+  -webkit-appearance:none;appearance:none;
+  background:var(--border);border-radius:2px;outline:none;cursor:pointer;
+  transition:background var(--transition);
+}
+input[type=range].day-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:3px solid var(--bg-card);
+  box-shadow:0 0 0 2px var(--accent);cursor:pointer;
+  transition:transform var(--transition);
+}
+input[type=range].day-slider::-webkit-slider-thumb:hover{transform:scale(1.2);}
+input[type=range].day-slider::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;
+  background:var(--accent);border:3px solid var(--bg-card);
+  cursor:pointer;
+}
+.slider-ticks{display:flex;justify-content:space-between;margin-top:6px;padding:0 4px;}
+.slider-tick{font-family:var(--font-display);font-size:9px;color:var(--text-muted);text-align:center;flex:1;}
+.slider-tick.active{color:var(--accent);font-weight:700;}
+
+/* Bars */
+.price-hist-bars{display:flex;align-items:flex-end;gap:3px;height:170px;padding:28px 4px 0;position:relative;}
+.price-hist-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;cursor:pointer;}
+.price-hist-bar-wrap:hover .price-hist-bar{filter:brightness(1.15);}
+.price-hist-bar{width:100%;background:var(--accent);border-radius:4px 4px 0 0;transition:height 0.4s cubic-bezier(0.4,0,0.2,1),background 0.2s;position:relative;min-height:0;opacity:0.88;}
 .price-hist-bar.median-bar{background:var(--green);}
-.price-hist-count{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--font-display);font-size:10px;font-weight:700;color:var(--text-primary);white-space:nowrap;}
-.price-hist-label{font-family:var(--font-display);font-size:9px;color:var(--text-muted);margin-top:6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
-.price-hist-legend{display:flex;gap:16px;margin-top:12px;font-family:var(--font-display);font-size:11px;color:var(--text-muted);flex-wrap:wrap;}
+.price-hist-bar.q1-bar{background:var(--blue-light);}
+.price-hist-bar.q3-bar{background:var(--blue-light);}
+.price-hist-count{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--font-display);font-size:10px;font-weight:700;color:var(--text-primary);white-space:nowrap;opacity:0;transition:opacity 0.2s;}
+.price-hist-bar-wrap:hover .price-hist-count{opacity:1;}
+.price-hist-label{font-family:var(--font-display);font-size:9px;color:var(--text-muted);margin-top:5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
+
+/* Tooltip on hover */
+.price-hist-tooltip{position:fixed;background:var(--bg-card);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:8px 12px;font-family:var(--font-display);font-size:11px;color:var(--text-primary);pointer-events:none;z-index:500;display:none;box-shadow:var(--shadow);white-space:nowrap;}
+
+/* Legend + stats */
+.price-hist-legend{display:flex;gap:14px;margin-top:12px;font-family:var(--font-display);font-size:11px;color:var(--text-muted);flex-wrap:wrap;}
 .price-hist-legend span{display:flex;align-items:center;gap:5px;}
 .legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0;}
-.price-hist-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:1px;background:var(--border);margin-top:16px;border-radius:var(--radius-sm);overflow:hidden;}
-.price-hist-stat{background:var(--bg-card);padding:12px 14px;text-align:center;}
-.price-hist-stat-val{font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--accent);}
-.price-hist-stat-lbl{font-size:10px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.4px;}
+.price-hist-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:1px;background:var(--border);margin-top:14px;border-radius:var(--radius-sm);overflow:hidden;}
+.price-hist-stat{background:var(--bg-card);padding:11px 12px;text-align:center;transition:background var(--transition);}
+.price-hist-stat:hover{background:var(--accent-bg);}
+.price-hist-stat-val{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--accent);}
+.price-hist-stat-lbl{font-size:9px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.4px;}
 
 /* ─── Line chart ─── */
 .line-chart-section{padding:24px;border-bottom:1px solid var(--border);}
@@ -291,16 +328,24 @@ body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-
     <!-- Price histogram -->
     <div class="price-hist-section">
       <div class="price-hist-header">
-        <div class="price-hist-title">💰 ROZKŁAD AKTUALNYCH CEN</div>
-        <div class="price-hist-meta" id="priceHistMeta">—</div>
+        <div class="price-hist-title">💰 ROZKŁAD CEN</div>
+        <div class="price-hist-day-label" id="priceHistDayLabel">—</div>
+      </div>
+      <div class="price-hist-slider-wrap" id="priceHistSliderWrap">
+        <div class="price-hist-slider-track">
+          <input type="range" class="day-slider" id="daySlider" min="0" max="0" value="0" oninput="onDaySlider(this.value)">
+        </div>
+        <div class="slider-ticks" id="sliderTicks"></div>
       </div>
       <div class="price-hist-bars" id="priceHistBars"></div>
       <div class="price-hist-legend">
         <span><span class="legend-dot" style="background:var(--accent)"></span>Przedział cenowy</span>
-        <span><span class="legend-dot" style="background:var(--green)"></span>Przedział z medianą</span>
+        <span><span class="legend-dot" style="background:var(--green)"></span>Mediana</span>
+        <span><span class="legend-dot" style="background:var(--blue-light)"></span>Q1 / Q3</span>
       </div>
       <div class="price-hist-stats" id="priceHistStats"></div>
     </div>
+    <div class="price-hist-tooltip" id="priceHistTooltip"></div>
 
     <!-- Line chart -->
     <div class="line-chart-section">
@@ -518,86 +563,197 @@ function renderStats(key) {
   `;
 }
 
-// ─── Price Histogram ───────────────────────────────────────
+// ─── Price Histogram with day slider ──────────────────────
+let histKey        = null;
+let histDayIndex   = 0;   // current slider position (index into histDays)
+let histDays       = [];  // [{date, listings:[{price,...}]}]
+let globalStep     = 250; // bucket width, computed once across all days
+
 function renderPriceHistogram(key) {
+  histKey = key;
   const data     = dashData.profiles[key];
-  const listings = (data.current_listings || []).filter(l => l.price && l.price > 0);
+  const counts   = data.daily_counts || [];
+  const current  = data.current_listings || [];
+  const archived = data.archived_listings || [];
+  const all      = [...current, ...archived];
 
-  const barsEl  = document.getElementById('priceHistBars');
+  // Build per-day snapshot: for each day in daily_counts, collect listings active that day
+  // A listing was active on date D if first_seen[:10] <= D <= (archived_date[:10] or today)
+  const today = new Date().toISOString().slice(0,10);
+
+  histDays = counts.map(entry => {
+    const d = entry.date;
+    const dayListings = all.filter(l => {
+      const fs  = (l.first_seen  || '').slice(0,10);
+      const arc = (l.archived_date || today).slice(0,10);
+      if (!fs) return false;
+      // Was this listing active on day d?
+      if (fs > d || arc < d) return false;
+      // Get price for that day: use price_history to find correct price
+      return true;
+    }).map(l => {
+      // Reconstruct price at day d using price_history
+      let price = l.price;
+      const ph = (l.price_history || []).concat(
+        Object.values(data.price_history || {}).flat()
+          .filter(h => (all.find(x=>x.id===l.id)))
+      );
+      // Price history from profile-level price_history object
+      const listingPH = (data.price_history || {})[l.id] || [];
+      if (listingPH.length) {
+        // Find the price that was active on day d
+        // price_history entries: {date, old_price, new_price}
+        // Walk backwards to find last change before/on d
+        const before = listingPH.filter(h => h.date.slice(0,10) <= d);
+        if (before.length) {
+          // On day d the price was old_price of the NEXT change after d, or new_price of last change on/before d
+          const afterD = listingPH.find(h => h.date.slice(0,10) > d);
+          if (afterD) price = afterD.old_price;   // price before the next change
+          else        price = listingPH[listingPH.length-1].new_price; // last known
+        } else {
+          // No changes before d — use first_price or earliest old_price
+          price = listingPH[0].old_price;
+        }
+      }
+      return {id: l.id, title: l.title, price, url: l.url};
+    }).filter(l => l.price && l.price > 0);
+
+    return {date: d, count: entry.count, listings: dayListings};
+  });
+
+  // Compute global bucket step from all prices across all days (consistent bins)
+  const allPrices = histDays.flatMap(d => d.listings.map(l => l.price));
+  if (allPrices.length > 0) {
+    const gMin = Math.min(...allPrices), gMax = Math.max(...allPrices);
+    const rawStep = (gMax - gMin) / 14;
+    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(rawStep,1))));
+    const steps = [1,2,2.5,5,10].map(f => f*mag);
+    globalStep = steps.find(s => s >= rawStep) || steps[steps.length-1];
+  }
+
+  // Setup slider
+  const slider    = document.getElementById('daySlider');
+  const sliderMax = Math.max(0, histDays.length - 1);
+  slider.max      = sliderMax;
+  histDayIndex    = sliderMax; // start at latest day
+  slider.value    = histDayIndex;
+
+  renderSliderTicks();
+  drawHistogram(histDayIndex);
+}
+
+function renderSliderTicks() {
+  const ticksEl = document.getElementById('sliderTicks');
+  if (histDays.length <= 1) { ticksEl.innerHTML=''; return; }
+  const maxTicks = 10;
+  const step     = Math.max(1, Math.ceil(histDays.length / maxTicks));
+  let html = '';
+  histDays.forEach((d, i) => {
+    const show = i===0 || i===histDays.length-1 || i%step===0;
+    const isActive = i===histDayIndex;
+    if (show) {
+      const [,mm,dd] = d.date.split('-');
+      html += `<span class="slider-tick${isActive?' active':''}">${dd}.${mm}</span>`;
+    }
+  });
+  ticksEl.innerHTML = html;
+}
+
+function onDaySlider(val) {
+  histDayIndex = parseInt(val);
+  renderSliderTicks();
+  drawHistogram(histDayIndex);
+}
+
+function drawHistogram(idx) {
+  const day = histDays[idx];
+  if (!day) return;
+
+  const dayLbl = document.getElementById('priceHistDayLabel');
+  const barsEl = document.getElementById('priceHistBars');
   const statsEl = document.getElementById('priceHistStats');
-  const metaEl  = document.getElementById('priceHistMeta');
 
-  if (!listings.length) {
-    barsEl.innerHTML  = `<div style="width:100%;text-align:center;color:var(--text-muted);font-size:13px;padding:40px 0;font-family:var(--font-display);">Brak ogłoszeń z cenami</div>`;
+  // Format date label
+  const [y,m,d] = day.date.split('-');
+  dayLbl.textContent = `${d}.${m}.${y}  ·  ${day.listings.length} ogłoszeń z ceną`;
+
+  if (!day.listings.length) {
+    barsEl.innerHTML = `<div style="width:100%;text-align:center;color:var(--text-muted);font-size:13px;padding:50px 0;font-family:var(--font-display);">Brak ogłoszeń z ceną w tym dniu</div>`;
     statsEl.innerHTML = '';
-    metaEl.textContent = '—';
     return;
   }
 
-  const prices = listings.map(l => l.price).sort((a,b) => a-b);
-  const minP   = prices[0];
-  const maxP   = prices[prices.length - 1];
-  const avgP   = Math.round(prices.reduce((a,b) => a+b, 0) / prices.length);
-  const n      = prices.length;
-  const medP   = n % 2 !== 0 ? prices[Math.floor(n/2)] : Math.round((prices[n/2-1] + prices[n/2])/2);
+  const prices = day.listings.map(l=>l.price).sort((a,b)=>a-b);
+  const n   = prices.length;
+  const minP = prices[0], maxP = prices[n-1];
+  const avgP = Math.round(prices.reduce((a,b)=>a+b,0)/n);
+  const medP = n%2!==0 ? prices[Math.floor(n/2)] : Math.round((prices[n/2-1]+prices[n/2])/2);
+  const p25  = prices[Math.floor(n*0.25)];
+  const p75  = prices[Math.floor(n*0.75)];
 
-  // Auto bucket size: aim for ~12 buckets, round to nice number
-  const rawStep = (maxP - minP) / 12;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const niceSteps = [1,2,2.5,5,10].map(f => f*magnitude);
-  const step = niceSteps.find(s => s >= rawStep) || niceSteps[niceSteps.length-1];
-
-  const bucketStart = Math.floor(minP / step) * step;
+  // Build buckets using global step for consistent X-axis
+  const bucketStart = Math.floor(minP / globalStep) * globalStep;
   const buckets = [];
-  for (let s = bucketStart; s < maxP + step; s += step) {
-    buckets.push({from: s, to: s + step, count: 0});
+  for (let s = bucketStart; s <= maxP + globalStep; s += globalStep) {
+    buckets.push({from:s, to:s+globalStep, count:0, listings:[]});
   }
-  for (const p of prices) {
-    const b = buckets.find(b => p >= b.from && p < b.to);
-    if (b) b.count++;
-    else if (p === maxP) buckets[buckets.length-1].count++;
+  for (const l of day.listings) {
+    const b = buckets.find(b => l.price>=b.from && l.price<b.to);
+    if (b) { b.count++; b.listings.push(l); }
+    else if (l.price===maxP) { buckets[buckets.length-1].count++; buckets[buckets.length-1].listings.push(l); }
   }
-  // Remove empty trailing buckets
-  while (buckets.length > 1 && buckets[buckets.length-1].count === 0) buckets.pop();
+  // Trim empty edges
+  while (buckets.length>1 && buckets[buckets.length-1].count===0) buckets.pop();
+  while (buckets.length>1 && buckets[0].count===0) buckets.shift();
 
-  const maxCount = Math.max(...buckets.map(b => b.count), 1);
-  const medBucketIdx = buckets.findIndex(b => medP >= b.from && medP < b.to);
+  const maxCount = Math.max(...buckets.map(b=>b.count), 1);
+  const fmtP = p => p>=1000 ? `${(p/1000).toFixed(p%1000===0?0:1)}k` : String(p);
 
-  const fmtPrice = p => p >= 1000 ? `${Math.round(p/100)/10}k` : String(p);
+  const medBucket = buckets.findIndex(b => medP>=b.from && medP<b.to);
+  const q1Bucket  = buckets.findIndex(b => p25>=b.from && p25<b.to);
+  const q3Bucket  = buckets.findIndex(b => p75>=b.from && p75<b.to);
 
   let html = '';
-  buckets.forEach((b, i) => {
-    const heightPct = (b.count / maxCount) * 85 + 3;
-    const isMedian  = i === medBucketIdx;
-    const countHtml = b.count > 0 ? `<span class="price-hist-count">${b.count}</span>` : '';
+  buckets.forEach((b,i) => {
+    const h   = Math.max((b.count/maxCount)*85, b.count>0?3:0);
+    const cls = i===medBucket ? 'median-bar' : (i===q1Bucket||i===q3Bucket) ? 'q1-bar' : '';
+    const tip = `${b.from.toLocaleString('pl-PL')}–${b.to.toLocaleString('pl-PL')} zł\n${b.count} ogłoszeń`;
     html += `
-      <div class="price-hist-bar-wrap">
-        <div class="price-hist-bar${isMedian?' median-bar':''}" style="height:${heightPct}%" title="${b.from.toLocaleString('pl-PL')}–${b.to.toLocaleString('pl-PL')} zł: ${b.count} ogłoszeń">
-          ${b.count > 0 ? countHtml : ''}
+      <div class="price-hist-bar-wrap" onmouseenter="showHistTip(event,'${tip}')" onmouseleave="hideHistTip()" onmousemove="moveHistTip(event)">
+        <div class="price-hist-bar ${cls}" style="height:${h}%">
+          <span class="price-hist-count">${b.count||''}</span>
         </div>
-        <span class="price-hist-label">${fmtPrice(b.from)}</span>
+        <span class="price-hist-label">${fmtP(b.from)}</span>
       </div>`;
   });
   barsEl.innerHTML = html;
 
-  // Stats row
-  const withPrice = listings.length;
-  const noPrice   = (data.current_listings||[]).length - withPrice;
-  const p25 = prices[Math.floor(n*0.25)];
-  const p75 = prices[Math.floor(n*0.75)];
-
   statsEl.innerHTML = `
     <div class="price-hist-stat"><div class="price-hist-stat-val">${minP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Min</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--blue-light)">${p25.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Q1 25%</div></div>
     <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--green)">${medP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Mediana</div></div>
     <div class="price-hist-stat"><div class="price-hist-stat-val">${avgP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Średnia</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--blue-light)">${p75.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Q3 75%</div></div>
     <div class="price-hist-stat"><div class="price-hist-stat-val">${maxP.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Max</div></div>
-    <div class="price-hist-stat"><div class="price-hist-stat-val">${p25.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Q1 (25%)</div></div>
-    <div class="price-hist-stat"><div class="price-hist-stat-val">${p75.toLocaleString('pl-PL')} zł</div><div class="price-hist-stat-lbl">Q3 (75%)</div></div>
-    <div class="price-hist-stat"><div class="price-hist-stat-val">${withPrice}</div><div class="price-hist-stat-lbl">Z ceną</div></div>
-    <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--text-muted)">${noPrice}</div><div class="price-hist-stat-lbl">Bez ceny</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val">${n}</div><div class="price-hist-stat-lbl">Z ceną</div></div>
+    <div class="price-hist-stat"><div class="price-hist-stat-val" style="color:var(--text-muted)">${(histDays[idx]?.count||0)-n}</div><div class="price-hist-stat-lbl">Bez ceny</div></div>
   `;
+}
 
-  metaEl.textContent = `${buckets.length} przedziałów po ${step.toLocaleString('pl-PL')} zł`;
+function showHistTip(e, text) {
+  const tip = document.getElementById('priceHistTooltip');
+  tip.style.display = 'block';
+  const [range, count] = text.split('\n');
+  tip.innerHTML = `<strong>${range}</strong><br>${count}`;
+  moveHistTip(e);
+}
+function moveHistTip(e) {
+  const tip = document.getElementById('priceHistTooltip');
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top  = (e.clientY - 40) + 'px';
+}
+function hideHistTip() {
+  document.getElementById('priceHistTooltip').style.display = 'none';
 }
 
 // ─── Line Chart ────────────────────────────────────────────
