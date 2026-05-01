@@ -1,13 +1,13 @@
 {
-  "status": "pending",
-  "timestamp": null,
-  "timestamp_local": null,
-  "duration_seconds": null,
-  "listings_total": null,
+  "status": "success",
+  "timestamp": "2026-05-01T09:05:26Z",
+  "timestamp_local": "2026-05-01 09:05:26",
+  "duration_seconds": 78,
+  "listings_total": 0,
   "listings_new": null,
   "listings_removed": null,
-  "scan_number": 0,
-  "crosscheck": null,
+  "scan_number": 1,
   "error": null,
-  "error_detail": null
+  "error_detail": null,
+  "crosscheck": "error"
 }
