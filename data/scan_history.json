@@ -1,5 +1,5 @@
 {
-  "total_scans": 1,
+  "total_scans": 2,
   "scans": [
     {
       "timestamp": "2026-05-01T09:05:26Z",
@@ -11,6 +11,18 @@
       "listings_removed": null,
       "scan_number": 1,
       "crosscheck": "error",
+      "error": null
+    },
+    {
+      "timestamp": "2026-05-01T10:04:02Z",
+      "timestamp_local": "2026-05-01 10:04:02",
+      "status": "success",
+      "duration_seconds": 82,
+      "listings_total": 584,
+      "listings_new": 584,
+      "listings_removed": 0,
+      "scan_number": 2,
+      "crosscheck": "passed",
       "error": null
     }
   ]
