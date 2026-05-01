@@ -327,7 +327,7 @@ def scrape_with_crosscheck(profile_key, profile_config):
     scraped, header = r1["count"], r1["header_count"]
     # OLX miesza ~38% kart Otodom w wynikach kategorii — tolerancja musi to uwzględniać.
     # Dla kategorii: do 50% różnicy to normalne zachowanie OLX.
-    tolerance = int(header_count * 0.50) if (profile_config.get("is_category") and header_count) else 10
+    tolerance = int(header * 0.50) if (profile_config.get("is_category") and header) else 10
     if header is None or abs(scraped - header) <= tolerance:
         log.info(f"[CROSSCHECK] {profile_key}: PASS (scraped={scraped}, header={header})")
         r1["crosscheck"] = "passed"
