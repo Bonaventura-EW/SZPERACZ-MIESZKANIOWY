@@ -1,13 +1,13 @@
 {
   "status": "success",
-  "timestamp": "2026-05-06T09:30:41Z",
-  "timestamp_local": "2026-05-06 09:30:41",
-  "duration_seconds": 97,
-  "listings_total": 628,
-  "listings_new": 27,
-  "listings_removed": 0,
-  "scan_number": 7,
+  "timestamp": "2026-05-07T09:40:34Z",
+  "timestamp_local": "2026-05-07 09:40:34",
+  "duration_seconds": 73,
+  "listings_total": 135,
+  "listings_new": 0,
+  "listings_removed": 493,
+  "scan_number": 8,
   "error": null,
   "error_detail": null,
-  "crosscheck": "passed"
+  "crosscheck": "best_of_two"
 }
