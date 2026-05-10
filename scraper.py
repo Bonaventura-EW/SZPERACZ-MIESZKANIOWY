@@ -545,6 +545,8 @@ def generate_dashboard_json(scan_results, scan_timestamp):
     today   = scan_timestamp.strftime("%Y-%m-%d")
     data["last_scan"] = now_str
     scan_entry = {"timestamp": now_str, "date": today, "profiles": {}}
+    # Zbiera per-profil flow stats — zwracane do run_scan()
+    profile_flow_stats = {}
 
     for pk, result in scan_results.items():
         cfg = PROFILES[pk]
@@ -803,11 +805,21 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         pd_["current_listings"] = new_listings
         scan_entry["profiles"][pk] = {"count": result["count"], "crosscheck": crosscheck}
 
+        # Zapisz flow stats per profil
+        profile_flow_stats[pk] = {
+            "label":            PROFILES[pk]["label"],
+            "listings_total":   result["count"],
+            "listings_new":     flow_added,
+            "listings_removed": flow_removed,
+            "crosscheck":       crosscheck,
+        }
+
     data["scan_history"].append(scan_entry)
     if len(data["scan_history"]) > 90: data["scan_history"] = data["scan_history"][-90:]
     with open(JSON_PATH,"w",encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     log.info(f"Dashboard JSON saved: {JSON_PATH}")
+    return profile_flow_stats
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -826,7 +838,11 @@ def run_scan():
             log.error(f"[ERROR] {pk}: {e}")
             results[pk] = {"listings":[], "count":0, "header_count":None, "crosscheck":"error", "pages_scraped":0}
         time.sleep(random.uniform(2,4))
-    generate_dashboard_json(results, ts)
+    profile_flow = generate_dashboard_json(results, ts)
+    # Doklejamy flow stats do results — używane przez main.py do scan_status.json
+    for pk, flow in profile_flow.items():
+        if pk in results:
+            results[pk]["flow"] = flow
     update_excel(results, ts)
     log.info(f"SZPERACZ MIESZKANIOWY — Scan completed {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return results
