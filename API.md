@@ -27,7 +27,16 @@ Aktualizowany automatycznie po każdym scanie (codziennie ~9:00 CET, lub ręczni
   "listings_new": 8,
   "listings_removed": 3,
   "scan_number": 12,
-  "crosscheck": "passed",
+  "profiles": [
+    {
+      "key": "mieszkania_lublin",
+      "label": "Mieszkania na wynajem — Lublin",
+      "listings_total": 124,
+      "listings_new": 8,
+      "listings_removed": 3,
+      "crosscheck": "passed"
+    }
+  ],
   "error": null,
   "error_detail": null
 }
@@ -45,8 +54,8 @@ Aktualizowany automatycznie po każdym scanie (codziennie ~9:00 CET, lub ręczni
   "listings_new": null,
   "listings_removed": null,
   "scan_number": 13,
-  "crosscheck": null,
-  "error": "ConnectionTimeout: HTTPSConnectionPool(host='www.olx.pl'...",
+  "profiles": [],
+  "error": "ConnectionTimeout: HTTPSConnectionPool(host='www.olx.pl'...)",
   "error_detail": "Traceback (most recent call last):\n  File ...\nrequests.exceptions.ConnectTimeout: ..."
 }
 ```
@@ -59,6 +68,7 @@ Aktualizowany automatycznie po każdym scanie (codziennie ~9:00 CET, lub ręczni
   "timestamp": null,
   "listings_total": null,
   "scan_number": 0,
+  "profiles": [],
   "error": null,
   "error_detail": null
 }
@@ -87,20 +97,17 @@ GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/
       "listings_new": 5,
       "listings_removed": 2,
       "scan_number": 41,
-      "crosscheck": "passed",
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "Mieszkania na wynajem — Lublin",
+          "listings_total": 119,
+          "listings_new": 5,
+          "listings_removed": 2,
+          "crosscheck": "passed"
+        }
+      ],
       "error": null
-    },
-    {
-      "timestamp": "2026-04-30T09:00:47Z",
-      "timestamp_local": "2026-04-30 11:00:47",
-      "status": "error",
-      "duration_seconds": 12,
-      "listings_total": null,
-      "listings_new": null,
-      "listings_removed": null,
-      "scan_number": 42,
-      "crosscheck": null,
-      "error": "ConnectionTimeout: ..."
     }
   ]
 }
@@ -112,7 +119,7 @@ GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/
 
 ## Opis pól
 
-### Pola wspólne
+### Pola główne
 
 | Pole | Typ | Opis |
 |------|-----|------|
@@ -121,24 +128,33 @@ GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/
 | `timestamp_local` | string / null | Czas lokalny (CET/CEST) |
 | `duration_seconds` | int / null | Czas trwania scanu w sekundach |
 | `scan_number` | int | Numer kolejny scanu (rośnie od 1) |
+| `listings_total` | int / null | Łączna liczba ogłoszeń (suma profili) |
+| `listings_new` | int / null | Łączna liczba nowych ogłoszeń |
+| `listings_removed` | int / null | Łączna liczba usuniętych ogłoszeń |
+| `profiles` | array | Szczegóły per profil (patrz niżej) |
+| `error` | string / null | Krótki opis błędu (max 200 znaków) |
+| `error_detail` | string / null | Ostatnie 800 znaków traceback (tylko w `scan_status.json`) |
 
-### Pola statusu
+### Pola obiektu `profiles[]`
 
 | Pole | Typ | Opis |
 |------|-----|------|
-| `listings_total` | int / null | Liczba ogłoszeń po scanie |
-| `listings_new` | int / null | Nowe ogłoszenia względem poprzedniego scanu |
-| `listings_removed` | int / null | Usunięte ogłoszenia względem poprzedniego scanu |
-| `crosscheck` | string / null | Wynik weryfikacji: `"passed"`, `"passed_retry"`, `"consistent"`, `"error"` |
-| `error` | string / null | Krótki opis błędu (max 200 znaków) |
-| `error_detail` | string / null | Ostatnie 800 znaków traceback (tylko w `scan_status.json`) |
+| `key` | string | Identyfikator profilu, np. `"mieszkania_lublin"` |
+| `label` | string | Czytelna nazwa profilu |
+| `listings_total` | int / null | Liczba ogłoszeń w tym profilu |
+| `listings_new` | int / null | Nowe ogłoszenia w tym profilu (null przy pierwszym scanie) |
+| `listings_removed` | int / null | Usunięte ogłoszenia w tym profilu (null przy pierwszym scanie) |
+| `crosscheck` | string / null | Wynik weryfikacji: `"passed"`, `"passed_retry"`, `"consistent"`, `"best_of_two"`, `"error"` |
+
+> `listings_new` i `listings_removed` są liczone na podstawie porównania **ID ogłoszeń** (nie różnicy liczb),
+> więc są dokładne nawet gdy OLX zmienia kolejność wyników.
 
 ---
 
 ## Polling — zalecenia
 
 - **Częstotliwość**: co 15–30 minut — dane zmieniają się raz dziennie o ~9:00 CET
-- **Cache busting**: dodaj `?t=<timestamp>` do URL żeby uniknąć cache przeglądarki
+- **Cache busting**: dodaj `?t=<unix_timestamp>` do URL żeby uniknąć cache
 - **Wykrywanie nowego scanu**: porównuj pole `scan_number` lub `timestamp`
 
 ```
@@ -152,14 +168,13 @@ https://raw.githubusercontent.com/.../scan_status.json?t=1746000000
 | Scan | Czas (CET) | Workflow |
 |------|-----------|---------|
 | Codzienny | 9:00 | `scan.yml` |
-| Backup | 11:00 | `failsafe.yml` |
-| Ręczny | dowolny | przycisk "Scan teraz" w dashboardzie |
+| Ręczny | dowolny | GitHub Actions → workflow_dispatch |
 
 ---
 
-## Dodatkowe dane (dashboard)
+## Dodatkowe dane (dashboard webowy)
 
-Pełne dane ogłoszeń (dla dashboardu webowego):
+Pełne dane ogłoszeń:
 ```
 GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/dashboard_data.json
 ```
