@@ -897,8 +897,8 @@
         },
         {
           "date": "2026-05-12",
-          "count": 615,
-          "change": 23,
+          "count": 614,
+          "change": 22,
           "timestamp": "2026-05-12 09:45:23",
           "median_price": 2425,
           "promoted_count": 28,
@@ -933,41 +933,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 0
-            },
-            {
-              "from": 12000,
-              "to": 13000,
-              "count": 1
             }
           ],
           "refreshed_count": 30,
@@ -15848,40 +15813,6 @@
           "refresh_history": []
         },
         {
-          "id": "1aiWVL",
-          "title": "Lokal 160 m² w centrum Lublina w sąsiedztwie Ogrodu Saskiego",
-          "price": 12800,
-          "price_text": "12 800 złdo negocjacji",
-          "url": "https://www.olx.pl/d/oferta/lokal-160-m-w-centrum-lublina-w-sasiedztwie-ogrodu-saskiego-CID3-ID1aiWVL.html?search_reason=search%7Corganic",
-          "published": "2026-04-22",
-          "refreshed": null,
-          "date_text": "22 kwietnia 2026",
-          "image_url": "/app/static/media/no_thumbnail.15f456ec5.svg",
-          "first_seen": "2026-04-30 06:21:31",
-          "last_seen": "2026-05-12 09:45:23",
-          "is_promoted": false,
-          "promotion_type": null,
-          "refresh_count": 0,
-          "promoted_days_current": 0,
-          "promoted_sessions_count": 0,
-          "promotion_history": [],
-          "reactivation_count": 2,
-          "reactivation_history": [
-            {
-              "active_from": "2026-04-30 06:21:31",
-              "reactivated_at": "2026-05-05 09:12:14",
-              "active_to_current": "2026-05-07 09:40:35"
-            },
-            {
-              "active_from": "2026-04-30 06:21:31",
-              "reactivated_at": "2026-05-08 08:25:13"
-            }
-          ],
-          "previous_price": 11000,
-          "price_change": 1800,
-          "refresh_history": []
-        },
-        {
           "id": "19cCUn",
           "title": "Mieszkanie 2 pokoje Kryształowa",
           "price": 2000,
@@ -26985,39 +26916,6 @@
           "archived_date": "2026-05-07 09:40:35"
         },
         {
-          "id": "1aiWVL",
-          "title": "Lokal 160 m² w centrum Lublina w sąsiedztwie Ogrodu Saskiego",
-          "price": 11000,
-          "price_text": "11 000 złdo negocjacji",
-          "url": "https://www.olx.pl/d/oferta/lokal-160-m-w-centrum-lublina-w-sasiedztwie-ogrodu-saskiego-CID3-ID1aiWVL.html?search_reason=search%7Corganic",
-          "published": "2026-04-22",
-          "refreshed": null,
-          "date_text": "22 kwietnia 2026",
-          "image_url": "/app/static/media/no_thumbnail.15f456ec5.svg",
-          "first_seen": "2026-04-30 06:21:31",
-          "last_seen": "2026-05-06 09:30:43",
-          "is_promoted": false,
-          "promotion_type": null,
-          "refresh_count": 0,
-          "promoted_days_current": 0,
-          "promoted_sessions_count": 0,
-          "promotion_history": [],
-          "reactivation_count": 1,
-          "reactivation_history": [
-            {
-              "active_from": "2026-04-30 06:21:31",
-              "reactivated_at": "2026-05-05 09:12:14",
-              "active_to_current": "2026-05-07 09:40:35"
-            },
-            {
-              "active_from": "2026-04-30 06:21:31",
-              "reactivated_at": "2026-05-08 08:25:13"
-            }
-          ],
-          "refresh_history": [],
-          "archived_date": "2026-05-07 09:40:35"
-        },
-        {
           "id": "1a8lxx",
           "title": "Mieszkanie dwupokojowe Kalinowszczyzna",
           "price": 2000,
@@ -34260,14 +34158,6 @@
             "change": -100
           }
         ],
-        "1aiWVL": [
-          {
-            "date": "2026-05-12 09:45:23",
-            "old_price": 11000,
-            "new_price": 12800,
-            "change": 1800
-          }
-        ],
         "19K99r": [
           {
             "date": "2026-05-12 09:45:23",
@@ -34714,7 +34604,6 @@
         "1afkOs": [],
         "19o3gN": [],
         "1a7aGn": [],
-        "1aiWVL": [],
         "1afw4G": [],
         "19Mush": [],
         "1abAfp": [],

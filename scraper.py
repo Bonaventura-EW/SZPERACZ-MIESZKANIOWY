@@ -28,6 +28,11 @@ PROFILES = {
     },
 }
 
+# Maksymalna akceptowana cena ofert. Oferty z ceną powyżej tej wartości są
+# odrzucane na etapie parsowania (cicho — bez logów i bez wpływu na crosscheck
+# poza dolnym progiem). Oferty bez ceny (price=None) przepuszczamy.
+MAX_PRICE = 10000
+
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 EXCEL_PATH = os.path.join(DATA_DIR, "szperacz_mieszkaniowy.xlsx")
 JSON_PATH  = os.path.join(DATA_DIR, "dashboard_data.json")
@@ -266,6 +271,9 @@ def parse_listings_from_soup(soup):
         parsed = parse_card(card)
         if parsed:
             listings.append(parsed)
+    # Filtr cenowy — oferty powyżej MAX_PRICE są odrzucane po cichu.
+    # Oferty z price=None (np. "Zapytaj o cenę") są przepuszczane.
+    listings = [l for l in listings if l.get("price") is None or l["price"] <= MAX_PRICE]
     return listings
 
 def get_total_count_from_header(soup):
