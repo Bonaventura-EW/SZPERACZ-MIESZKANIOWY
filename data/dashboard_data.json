@@ -7,7 +7,7 @@
       "daily_counts": [
         {
           "date": "2026-04-30",
-          "count": 600,
+          "count": 599,
           "change": 0,
           "timestamp": "2026-04-30 07:58:20",
           "median_price": 2400,
@@ -47,42 +47,12 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ]
         },
         {
           "date": "2026-05-01",
-          "count": 584,
+          "count": 583,
           "change": -16,
           "timestamp": "2026-05-01 10:04:03",
           "median_price": 2000,
@@ -118,36 +88,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 17,
@@ -157,7 +97,7 @@
         },
         {
           "date": "2026-05-02",
-          "count": 580,
+          "count": 579,
           "change": -4,
           "timestamp": "2026-05-02 08:24:51",
           "median_price": 2250,
@@ -193,36 +133,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 24,
@@ -232,7 +142,7 @@
         },
         {
           "date": "2026-05-03",
-          "count": 572,
+          "count": 571,
           "change": -8,
           "timestamp": "2026-05-03 08:51:51",
           "median_price": 2250,
@@ -268,36 +178,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 21,
@@ -308,7 +188,7 @@
         {
           "date": "2026-05-04",
           "count": 588,
-          "change": 16,
+          "change": 17,
           "timestamp": "2026-05-04 09:27:07",
           "median_price": 2200,
           "promoted_count": 34,
@@ -377,8 +257,8 @@
         },
         {
           "date": "2026-05-05",
-          "count": 601,
-          "change": 13,
+          "count": 600,
+          "change": 12,
           "timestamp": "2026-05-05 09:12:14",
           "median_price": 2300,
           "promoted_count": 24,
@@ -413,36 +293,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 36,
@@ -452,7 +302,7 @@
         },
         {
           "date": "2026-05-06",
-          "count": 628,
+          "count": 627,
           "change": 27,
           "timestamp": "2026-05-06 09:30:43",
           "median_price": 2350,
@@ -488,36 +338,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 24,
@@ -528,7 +348,7 @@
         {
           "date": "2026-05-07",
           "count": 135,
-          "change": -493,
+          "change": -492,
           "timestamp": "2026-05-07 09:40:35",
           "median_price": 2200,
           "promoted_count": 30,
@@ -597,8 +417,8 @@
         },
         {
           "date": "2026-05-08",
-          "count": 631,
-          "change": 496,
+          "count": 630,
+          "change": 495,
           "timestamp": "2026-05-08 08:25:13",
           "median_price": 2200,
           "promoted_count": 23,
@@ -633,36 +453,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 20,
@@ -672,7 +462,7 @@
         },
         {
           "date": "2026-05-09",
-          "count": 604,
+          "count": 603,
           "change": -27,
           "timestamp": "2026-05-09 08:45:53",
           "median_price": 2300,
@@ -708,36 +498,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 16,
@@ -747,7 +507,7 @@
         },
         {
           "date": "2026-05-10",
-          "count": 597,
+          "count": 596,
           "change": -7,
           "timestamp": "2026-05-10 08:59:31",
           "median_price": 2200,
@@ -783,36 +543,6 @@
               "from": 5000,
               "to": 6000,
               "count": 2
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 15,
@@ -822,7 +552,7 @@
         },
         {
           "date": "2026-05-11",
-          "count": 592,
+          "count": 591,
           "change": -5,
           "timestamp": "2026-05-11 10:41:01",
           "median_price": 2125,
@@ -858,36 +588,6 @@
               "from": 5000,
               "to": 6000,
               "count": 1
-            },
-            {
-              "from": 6000,
-              "to": 7000,
-              "count": 0
-            },
-            {
-              "from": 7000,
-              "to": 8000,
-              "count": 0
-            },
-            {
-              "from": 8000,
-              "to": 9000,
-              "count": 0
-            },
-            {
-              "from": 9000,
-              "to": 10000,
-              "count": 0
-            },
-            {
-              "from": 10000,
-              "to": 11000,
-              "count": 0
-            },
-            {
-              "from": 11000,
-              "to": 12000,
-              "count": 1
             }
           ],
           "refreshed_count": 31,
@@ -898,7 +598,7 @@
         {
           "date": "2026-05-12",
           "count": 614,
-          "change": 22,
+          "change": 23,
           "timestamp": "2026-05-12 09:45:23",
           "median_price": 2425,
           "promoted_count": 28,
