@@ -242,6 +242,16 @@ input[type=range].day-slider::-moz-range-thumb{
 .status-toast.error{background:var(--red);color:#fff;}
 .status-toast.info{background:var(--accent);color:var(--blue);}
 
+/* ─── Pagination ─── */
+.pagination-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--accent-bg);border:1px solid var(--border);border-radius:var(--radius-sm);margin:10px 0;font-family:var(--font-display);}
+.page-btn{display:flex;align-items:center;gap:5px;padding:7px 18px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-family:var(--font-display);font-size:12px;font-weight:700;cursor:pointer;transition:all var(--transition);letter-spacing:0.3px;}
+.page-btn:not(:disabled):hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.2);}
+.page-btn:not(:disabled):active{transform:translateY(0);}
+.page-btn:disabled{opacity:0.28;cursor:default;}
+.page-info{color:var(--text-muted);font-size:12px;font-family:var(--font-display);letter-spacing:0.2px;}
+.page-info strong{color:var(--accent);font-weight:700;}
+@media(max-width:768px){.pagination-bar{flex-wrap:wrap;gap:8px;justify-content:center;padding:10px 12px;}.page-info{order:-1;width:100%;text-align:center;}}
+
 /* ─── Footer ─── */
 .footer{text-align:center;padding:24px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);margin-top:40px;font-family:var(--font-display);}
 .footer a{color:var(--accent);text-decoration:none;}
@@ -892,9 +902,9 @@ function buildPaginationBar(totalItems, anchorId) {
   const to   = Math.min(currentPage * PAGE_SIZE, totalItems);
   return `
   <div class="pagination-bar" id="${anchorId}">
-    <button class="page-btn" onclick="goPage(${currentPage-1})" ${hasPrev?'':'disabled'}>← Nowsze</button>
-    <span class="page-info">Strona <strong>${currentPage}</strong> z ${totalPages} &nbsp;(${totalItems} ogłoszeń łącznie)</span>
-    <button class="page-btn" onclick="goPage(${currentPage+1})" ${hasNext?'':'disabled'}>Starsze →</button>
+    <button class="page-btn" onclick="goPage(${currentPage-1})" ${hasPrev?'':'disabled'}>&#8592; Nowsze</button>
+    <span class="page-info">Strona &nbsp;<strong>${currentPage}</strong>&nbsp; z &nbsp;${totalPages} &nbsp;·&nbsp; ${totalItems} ogłoszeń łącznie</span>
+    <button class="page-btn" onclick="goPage(${currentPage+1})" ${hasNext?'':'disabled'}>Starsze &#8594;</button>
   </div>`;
 }
 
