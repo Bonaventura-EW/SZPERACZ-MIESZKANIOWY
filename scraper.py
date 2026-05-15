@@ -117,67 +117,106 @@ def extract_listing_id(url):
 
 def detect_promoted_status(card):
     """
-    Wykrywa promowane ogłoszenia OLX.
-    Priorytet sygnałów (od najsilniejszego):
-      1. URL zawiera search_reason=search%7Cpromoted  (pewne)
-      2. data-testid="adCard-featured" / "listing-ad-badge"  (pewne gdy obecne)
-      3. data-promoted / data-featured atrybut na karcie
-      4. Tekst badge: Wyróżnione / Promowane / TOP / Pilne / Premium
-      5. Klasa CSS: featured / promoted / top-ad / premium / vip
+    Wykrywa typ promocji ogłoszenia OLX.
+    Typy (od najsilniejszego sygnału):
+      top_listing  🔝  — Wyróżnione na górze listy (featured)
+      bump         ⬆️  — Podbite jednorazowo na górę
+      highlight    ✨  — Podświetlone tło
+      urgent       🔥  — Oznaczone jako pilne
+      premium      💎  — Strona/konto premium
     """
-    signals = []
+    signals = []  # lista krotek (typ_sygnału, pewność, sugerowany_promo_type)
 
-    # Sygnał 1: URL z parametrem promoted (działa na OLX 2025)
+    # ── Sygnał 1: URL ─────────────────────────────────────────────────────────
     for link in card.select('a[href*="/d/oferta/"]'):
         href = link.get('href', '')
+        # search_reason=search%7Cpromoted → wyróżnione na górze
         if 'search_reason=search%7Cpromoted' in href or 'reason=promoted' in href:
-            signals.append(('url_promoted', 1.0))
+            signals.append(('url_promoted', 1.0, 'top_listing'))
+            break
+        # push_up / bump w URL
+        if 'push_up' in href.lower() or 'bump' in href.lower():
+            signals.append(('url_bump', 0.95, 'bump'))
             break
         if 'promoted' in href.lower() and '/d/oferta/' in href and 'search_reason' not in href:
-            signals.append(('url_keyword', 0.85))
+            signals.append(('url_keyword', 0.80, 'top_listing'))
             break
 
-    # Sygnał 2: data-testid badges
-    if card.select_one('[data-testid="adCard-featured"]'):
-        signals.append(('featured_badge', 1.0))
-    if card.select_one('[data-testid="listing-ad-badge"]'):
-        signals.append(('ad_badge', 0.95))
-    # Nowy OLX 2025 — sprawdź też inne testid
-    for testid in ['adCard-promoted', 'adCard-top', 'ad-badge', 'badge-promoted']:
+    # ── Sygnał 2: data-testid ─────────────────────────────────────────────────
+    testid_map = {
+        'adCard-featured':   ('featured_badge',    1.0,  'top_listing'),
+        'listing-ad-badge':  ('listing_ad_badge',  0.95, 'top_listing'),
+        'adCard-promoted':   ('testid_promoted',   0.95, 'top_listing'),
+        'adCard-top':        ('testid_top',        0.95, 'top_listing'),
+        'adCard-bump':       ('testid_bump',       0.95, 'bump'),
+        'adCard-pushup':     ('testid_pushup',     0.95, 'bump'),
+        'ad-badge':          ('testid_ad_badge',   0.90, 'top_listing'),
+        'badge-promoted':    ('testid_badge_promo',0.90, 'top_listing'),
+        'adCard-urgent':     ('testid_urgent',     0.95, 'urgent'),
+        'adCard-premium':    ('testid_premium',    0.95, 'premium'),
+        'adCard-highlight':  ('testid_highlight',  0.95, 'highlight'),
+    }
+    for testid, (sig_name, conf, promo) in testid_map.items():
         if card.select_one(f'[data-testid="{testid}"]'):
-            signals.append((f'testid_{testid}', 0.95))
+            signals.append((sig_name, conf, promo))
 
-    # Sygnał 3: data atrybuty na karcie
+    # ── Sygnał 3: atrybuty data-* na karcie ───────────────────────────────────
     if card.get('data-promoted') or card.get('data-featured') or card.get('data-cy-promoted'):
-        signals.append(('data_attribute', 1.0))
+        signals.append(('data_promoted', 1.0, 'top_listing'))
+    if card.get('data-bump') or card.get('data-pushup') or card.get('data-push-up'):
+        signals.append(('data_bump', 0.95, 'bump'))
+    if card.get('data-urgent') or card.get('data-pilne'):
+        signals.append(('data_urgent', 0.95, 'urgent'))
+    if card.get('data-premium') or card.get('data-vip'):
+        signals.append(('data_premium', 0.95, 'premium'))
+    if card.get('data-highlight') or card.get('data-highlighted'):
+        signals.append(('data_highlight', 0.90, 'highlight'))
 
-    # Sygnał 4: tekst badge (szukaj w małych elementach, nie w całej karcie)
-    badge_texts = ['Wyróżnione', 'Promowane', 'Premium', 'TOP ogłoszenie', 'Pilne', 'Sponsorowane']
-    for el in card.select('span, div, p, strong'):
+    # ── Sygnał 4: tekst badge ─────────────────────────────────────────────────
+    #   Mapowanie tekst → typ promocji (porządek ma znaczenie: bardziej specyficzne pierwsze)
+    text_to_promo = [
+        # top_listing
+        (['Wyróżnione', 'Wyróżnione na górze', 'TOP ogłoszenie', 'TOP', 'Promowane', 'Sponsorowane'], 'top_listing', 0.90),
+        # bump
+        (['Podbite', 'Podbij', 'Odśwież', 'Push Up', 'Bump'], 'bump', 0.90),
+        # urgent
+        (['Pilne', 'Pilne!', 'PILNE', 'Срочно'], 'urgent', 0.92),
+        # premium
+        (['Premium', 'VIP', 'Pakiet Premium', 'Konto Premium'], 'premium', 0.92),
+        # highlight
+        (['Podświetlone', 'Wyróżnione tło', 'Highlighted'], 'highlight', 0.85),
+    ]
+    found_text_types = set()
+    for el in card.select('span, div, p, strong, em, label, [class*="badge"], [class*="label"], [class*="tag"]'):
         txt = el.get_text(strip=True)
-        if txt in badge_texts:
-            signals.append(('text_badge', 0.90))
-            break
+        for texts, promo, conf in text_to_promo:
+            if txt in texts and promo not in found_text_types:
+                signals.append((f'text_{promo}', conf, promo))
+                found_text_types.add(promo)
+                break
 
-    # Sygnał 5: klasy CSS
+    # ── Sygnał 5: klasy CSS ───────────────────────────────────────────────────
     element_classes = ' '.join(card.get('class', [])).lower()
-    if any(kw in element_classes for kw in ['featured', 'promoted', 'top-ad', 'premium', 'vip', 'highlighted']):
-        signals.append(('css_class', 0.80))
+    css_map = [
+        (['top-ad', 'featured', 'promoted', 'wyroznienie', 'top_ad'], 'top_listing', 0.75),
+        (['bump', 'push-up', 'pushup', 'boosted'],                    'bump',        0.75),
+        (['urgent', 'pilne', 'asap'],                                  'urgent',      0.75),
+        (['premium', 'vip', 'gold'],                                   'premium',     0.75),
+        (['highlighted', 'highlight', 'bg-accent', 'tlo'],            'highlight',   0.70),
+    ]
+    for keywords, promo, conf in css_map:
+        if any(kw in element_classes for kw in keywords):
+            signals.append((f'css_{promo}', conf, promo))
 
+    # ── Wynik ─────────────────────────────────────────────────────────────────
     if not signals:
         return {'is_promoted': False, 'promotion_type': None, 'confidence': 1.0}
 
-    max_conf = max(s[1] for s in signals)
-    types = [s[0] for s in signals]
-
-    if any(t in types for t in ['url_promoted', 'featured_badge', 'data_attribute']):
-        promo_type = 'featured'
-    elif 'ad_badge' in types or any(t.startswith('testid_') for t in types):
-        promo_type = 'top_ad'
-    elif 'url_keyword' in types or 'text_badge' in types:
-        promo_type = 'highlight'
-    else:
-        promo_type = 'css_promoted'
+    # Wybierz typ o najwyższej pewności; przy remisie priorytet: top_listing > bump > urgent > premium > highlight
+    priority = {'top_listing': 5, 'bump': 4, 'urgent': 3, 'premium': 2, 'highlight': 1}
+    best = max(signals, key=lambda s: (s[1], priority.get(s[2], 0)))
+    promo_type = best[2]
+    max_conf   = best[1]
 
     return {'is_promoted': True, 'promotion_type': promo_type, 'confidence': max_conf}
 

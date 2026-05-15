@@ -215,7 +215,13 @@ input[type=range].day-slider::-moz-range-thumb{
 .date-cell{font-family:var(--font-display);font-size:11px;color:var(--text-secondary);}
 .num-cell{font-family:var(--font-display);font-size:12px;font-weight:600;text-align:center;}
 .new-badge{display:inline-block;padding:1px 6px;background:var(--accent);color:var(--blue);border-radius:3px;font-size:9px;font-weight:700;font-family:var(--font-display);margin-left:5px;}
-.promo-star{font-size:14px;display:inline-block;}
+.promo-star{font-size:16px;display:inline-block;line-height:1;cursor:default;}
+.promo-icon-top_listing{color:#f59e0b;}
+.promo-icon-bump{color:#3b82f6;}
+.promo-icon-highlight{color:#8b5cf6;}
+.promo-icon-urgent{color:#ef4444;}
+.promo-icon-premium{color:#0ea5e9;}
+.promo-none{color:var(--text-muted);}
 .refresh-icon{font-size:11px;color:var(--blue-light);margin-left:4px;display:inline-block;}
 
 /* ─── Modal ─── */
@@ -980,7 +986,7 @@ function renderListings(tab) {
   html += `<table class="listings-table"><thead><tr>
     ${th('first_seen','Ogłoszenie')}
     ${th('price','Cena','Cena ogłoszenia')}
-    <th title="Promowane">🎯</th>
+    <th title="Typ promocji: 🔝 Wyróżnione na górze · ⬆️ Podbite · ✨ Podświetlone · 🔥 Pilne · 💎 Premium" style="cursor:help;">🏷️ Promo</th>
     ${th('promoted_days','Dni prom.','Dni w bieżącej sesji promocji')}
     ${th('promoted_sessions','Sesje','Liczba sesji promocji')}
     ${th('price_change','Zmiana ceny')}
@@ -1002,7 +1008,18 @@ function renderListings(tab) {
     const newBadge = isNew && tab==='current' ? '<span class="new-badge">NOWE</span>' : '';
     const refreshIcon = l.refreshed ? '<span class="refresh-icon" title="Ogłoszenie odświeżone">↺</span>' : '';
 
-    const promoStar = l.is_promoted ? `<span class="promo-star" title="${l.promotion_type||'promoted'}">⭐</span>` : '—';
+    const PROMO_ICONS = {
+      top_listing: {icon:'🔝', label:'Wyróżnione na górze listy'},
+      bump:        {icon:'⬆️',  label:'Podbite jednorazowo na górę'},
+      highlight:   {icon:'✨', label:'Podświetlone tło'},
+      urgent:      {icon:'🔥', label:'Oznaczone jako pilne'},
+      premium:     {icon:'💎', label:'Konto / strona premium'},
+    };
+    const _pt = l.promotion_type || 'top_listing';
+    const _pi = l.is_promoted ? (PROMO_ICONS[_pt] || {icon:'⭐', label:_pt}) : null;
+    const promoStar = _pi
+      ? `<span class="promo-star promo-icon-${_pt}" title="${_pi.label}${l.promoted_days_current?' · '+l.promoted_days_current+' dni':''}${l.promoted_sessions_count?' · sesja #'+l.promoted_sessions_count:''}">${_pi.icon}</span>`
+      : '<span class="promo-none">—</span>';
     const promoDays = (l.is_promoted && l.promoted_days_current)
       ? `<span class="num-cell" style="color:${l.promoted_days_current>7?'var(--orange)':'var(--green)'}">${l.promoted_days_current}</span>` : '—';
     const promoSess = l.promoted_sessions_count
