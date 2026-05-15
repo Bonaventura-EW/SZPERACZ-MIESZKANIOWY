@@ -959,6 +959,13 @@ function renderListings(tab) {
         vb = b.first_seen ? Math.floor((Date.now()-new Date(b.first_seen.replace(' ','T')))/86400000) : 0;
         break;
       case 'archived': va=a.archived_date||''; vb=b.archived_date||''; break;
+      case 'promotion_type': {
+        // sort order: top_listing=5, bump=4, urgent=3, premium=2, highlight=1, none=0
+        const PROMO_ORDER = {top_listing:5, featured:5, bump:4, urgent:3, premium:2, highlight:1, css_promoted:1};
+        va = a.is_promoted ? (PROMO_ORDER[a.promotion_type] ?? 1) : 0;
+        vb = b.is_promoted ? (PROMO_ORDER[b.promotion_type] ?? 1) : 0;
+        break;
+      }
       default:
         va=a.first_seen||a.archived_date||''; vb=b.first_seen||b.archived_date||''; break;
     }
@@ -986,7 +993,7 @@ function renderListings(tab) {
   html += `<table class="listings-table"><thead><tr>
     ${th('first_seen','Ogłoszenie')}
     ${th('price','Cena','Cena ogłoszenia')}
-    <th title="Typ promocji: 🔝 Wyróżnione na górze · ⬆️ Podbite · ✨ Podświetlone · 🔥 Pilne · 💎 Premium" style="cursor:help;">🏷️ Promo</th>
+    ${th('promotion_type','🏷️ Promo','Typ promocji: 🔝 Wyróżnione · ⬆️ Podbite · ✨ Podświetlone · 🔥 Pilne · 💎 Premium')}
     ${th('promoted_days','Dni prom.','Dni w bieżącej sesji promocji')}
     ${th('promoted_sessions','Sesje','Liczba sesji promocji')}
     ${th('price_change','Zmiana ceny')}
@@ -998,6 +1005,15 @@ function renderListings(tab) {
     ${tab==='archived' ? th('archived','Zniknęło') : ''}
   </tr></thead><tbody>`;
 
+  const PROMO_ICONS = {
+    top_listing: {icon:'🔝', label:'Wyróżnione na górze listy'},
+    featured:    {icon:'🔝', label:'Wyróżnione na górze listy'},
+    bump:        {icon:'⬆️',  label:'Podbite jednorazowo na górę'},
+    highlight:   {icon:'✨', label:'Podświetlone tło'},
+    css_promoted:{icon:'✨', label:'Podświetlone tło'},
+    urgent:      {icon:'🔥', label:'Oznaczone jako pilne'},
+    premium:     {icon:'💎', label:'Konto / strona premium'},
+  };
   for (const l of pageItems) {
     const price  = l.price ? `${l.price.toLocaleString('pl-PL')} zł` : '—';
     let pcHtml   = '<span class="price-change">—</span>';
@@ -1008,14 +1024,7 @@ function renderListings(tab) {
     const newBadge = isNew && tab==='current' ? '<span class="new-badge">NOWE</span>' : '';
     const refreshIcon = l.refreshed ? '<span class="refresh-icon" title="Ogłoszenie odświeżone">↺</span>' : '';
 
-    const PROMO_ICONS = {
-      top_listing: {icon:'🔝', label:'Wyróżnione na górze listy'},
-      bump:        {icon:'⬆️',  label:'Podbite jednorazowo na górę'},
-      highlight:   {icon:'✨', label:'Podświetlone tło'},
-      urgent:      {icon:'🔥', label:'Oznaczone jako pilne'},
-      premium:     {icon:'💎', label:'Konto / strona premium'},
-    };
-    const _pt = l.promotion_type || 'top_listing';
+    const _pt = l.promotion_type || (l.is_promoted ? 'top_listing' : null);
     const _pi = l.is_promoted ? (PROMO_ICONS[_pt] || {icon:'⭐', label:_pt}) : null;
     const promoStar = _pi
       ? `<span class="promo-star promo-icon-${_pt}" title="${_pi.label}${l.promoted_days_current?' · '+l.promoted_days_current+' dni':''}${l.promoted_sessions_count?' · sesja #'+l.promoted_sessions_count:''}">${_pi.icon}</span>`
