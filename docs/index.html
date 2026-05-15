@@ -396,7 +396,7 @@ input[type=range].day-slider::-moz-range-thumb{
     </div>
 
     <!-- Listings -->
-    <div class="listings-section">
+    <div class="listings-section" id="listingsSection">
       <div class="listings-toolbar">
         <div class="listings-tabs">
           <button class="listing-tab active" onclick="switchTab('current',this)">Aktualne</button>
@@ -446,6 +446,8 @@ let currentTab    = 'current';
 let currentMetric = 'count';
 let sortCol       = 'first_seen';
 let sortAsc       = false;
+let currentPage   = 1;
+const PAGE_SIZE   = 200;
 let lineChart     = null;
 let priceHistChart = null;
 
@@ -869,7 +871,7 @@ function resetZoom() {
 
 // ─── Listings Table ─────────────────────────────────────────
 function switchTab(tab, btn) {
-  currentTab = tab; sortCol = 'first_seen'; sortAsc = false;
+  currentTab = tab; sortCol = 'first_seen'; sortAsc = false; currentPage = 1;
   document.querySelectorAll('.listing-tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   renderListings(tab);
@@ -877,7 +879,37 @@ function switchTab(tab, btn) {
 
 function doSort(col) {
   if (sortCol===col) sortAsc = !sortAsc; else {sortCol=col; sortAsc=true;}
+  currentPage = 1;
   renderListings(currentTab);
+}
+
+function buildPaginationBar(totalItems, anchorId) {
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  if (totalPages <= 1) return '';
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
+  const from = (currentPage - 1) * PAGE_SIZE + 1;
+  const to   = Math.min(currentPage * PAGE_SIZE, totalItems);
+  return `
+  <div class="pagination-bar" id="${anchorId}">
+    <button class="page-btn" onclick="goPage(${currentPage-1})" ${hasPrev?'':'disabled'}>← Nowsze</button>
+    <span class="page-info">Strona <strong>${currentPage}</strong> z ${totalPages} &nbsp;(${totalItems} ogłoszeń łącznie)</span>
+    <button class="page-btn" onclick="goPage(${currentPage+1})" ${hasNext?'':'disabled'}>Starsze →</button>
+  </div>`;
+}
+
+function goPage(n) {
+  const profiles = dashData.profiles || {};
+  const key = Object.keys(profiles)[0];
+  if (!key) return;
+  const data = profiles[key];
+  const raw  = currentTab==='current' ? (data.current_listings||[]) : (data.archived_listings||[]);
+  const totalPages = Math.ceil(raw.length / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(n, totalPages));
+  renderListings(currentTab);
+  // scroll to top of listings section
+  const el = document.getElementById('listingsSection');
+  if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function renderListings(tab) {
@@ -918,6 +950,12 @@ function renderListings(tab) {
     return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
   });
 
+  // Pagination slice
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  currentPage = Math.max(1, Math.min(currentPage, totalPages));
+  const pageItems = sorted.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+
   const now = Date.now();
   const th = (col, label, title='') => {
     const arrow = sortCol===col ? (sortAsc?' ↑':' ↓') : '';
@@ -925,7 +963,11 @@ function renderListings(tab) {
     return `<th class="${cls}" onclick="doSort('${col}')" title="${title}">${label}${arrow}</th>`;
   };
 
-  let html = `<table class="listings-table"><thead><tr>
+  const paginationTop = buildPaginationBar(totalItems, 'pag-top');
+  const paginationBot = buildPaginationBar(totalItems, 'pag-bot');
+
+  let html = paginationTop;
+  html += `<table class="listings-table"><thead><tr>
     ${th('first_seen','Ogłoszenie')}
     ${th('price','Cena','Cena ogłoszenia')}
     <th title="Promowane">🎯</th>
@@ -940,7 +982,7 @@ function renderListings(tab) {
     ${tab==='archived' ? th('archived','Zniknęło') : ''}
   </tr></thead><tbody>`;
 
-  for (const l of sorted) {
+  for (const l of pageItems) {
     const price  = l.price ? `${l.price.toLocaleString('pl-PL')} zł` : '—';
     let pcHtml   = '<span class="price-change">—</span>';
     if (l.price_change > 0) pcHtml = `<span class="price-change up">+${l.price_change} zł</span>`;
@@ -984,6 +1026,7 @@ function renderListings(tab) {
     </tr>`;
   }
   html += '</tbody></table>';
+  html += paginationBot;
   document.getElementById('listingsContent').innerHTML = html;
 }
 
