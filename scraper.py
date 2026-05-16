@@ -322,12 +322,44 @@ def get_total_count_from_header(soup):
     return None
 
 def get_next_page_url(soup, current_url):
+    """
+    Zwraca URL następnej strony.
+    OLX ukrywa `pagination-forward` na ostatnich stronach przed końcem,
+    mimo że dalsze strony nadal istnieją i mają ogłoszenia.
+    Dlatego najpierw próbujemy `pagination-forward`, a jeśli go nie ma —
+    szukamy maksymalnego `page=N` w linkach paginacji.
+    """
+    # 1) Standardowa próba: pagination-forward
     for sel in ['[data-testid="pagination-forward"]','[data-cy="pagination-forward"]']:
         pag = soup.select_one(sel)
         if pag:
             href = pag.get("href","")
             if href:
                 return href if href.startswith("http") else f"https://www.olx.pl{href}"
+
+    # 2) Fallback: szukamy najwyższego page=N w linkach paginacji
+    m_cur = re.search(r'page=(\d+)', current_url)
+    current_page = int(m_cur.group(1)) if m_cur else 1
+    max_page = current_page
+    pag_links = soup.select(
+        '[data-testid*="pagination"] a[href*="page="], '
+        '[data-cy*="pagination"] a[href*="page="]'
+    )
+    if not pag_links:
+        wrap = soup.select_one('[data-testid="pagination-wrapper"], [data-cy="pagination-wrapper"]')
+        if wrap:
+            pag_links = wrap.select('a[href*="page="]')
+    for a in pag_links:
+        m = re.search(r'page=(\d+)', a.get('href', ''))
+        if m:
+            n = int(m.group(1))
+            if n > max_page:
+                max_page = n
+    if max_page > current_page:
+        # Zbuduj URL do następnej strony, opierając się na bazowym URL bez parametru page
+        base = re.sub(r'[?&]page=\d+', '', current_url)
+        sep = '&' if '?' in base else '?'
+        return f"{base}{sep}page={current_page + 1}"
     return None
 
 # ─── Scraping + Crosscheck ───────────────────────────────────────────────────
@@ -338,6 +370,7 @@ def scrape_profile(profile_key, profile_config, session):
     header_count = None
     page = 1
     max_pages = 50
+    prev_page_ids = set()  # ochrona: jeśli kolejna strona zwraca te same ID — koniec
 
     while url and page <= max_pages:
         log.info(f"  [{profile_key}] Page {page}: {url}")
@@ -355,6 +388,12 @@ def scrape_profile(profile_key, profile_config, session):
         log.info(f"  [{profile_key}] Page {page}: {len(page_listings)} listings")
         if not page_listings:
             break
+        # Ochrona przed zapętleniem: jeśli OLX zwraca tę samą stronę (zamiast 404 lub redirect)
+        current_page_ids = {l["listing_id"] for l in page_listings}
+        if prev_page_ids and current_page_ids and current_page_ids.issubset(prev_page_ids):
+            log.info(f"  [{profile_key}] Page {page}: duplikat poprzedniej strony — koniec paginacji")
+            break
+        prev_page_ids = current_page_ids
         all_listings.extend(page_listings)
         url = get_next_page_url(soup, url)
         page += 1
@@ -820,11 +859,22 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                     nl["promoted_days_current"] = 1
                     nl["promoted_sessions_count"] = 1
 
-        # ── Archiving ──
+        # ── Archiving (z mechanizmem 2-scan confirmation) ──
+        # Ogłoszenie znika z OLX → missing_count += 1
+        # Archiwizujemy dopiero gdy missing_count >= 2 (potwierdzenie w 2 kolejnych scanach)
+        # "Missing once" pozostaje w current_listings, ale bez aktualizacji last_seen
         newly_archived = []
+        carried_missing = []  # missing_count == 1, pozostają w current_listings
+        new_ids = {nl["id"] for nl in new_listings}
         for old_l in pd_.get("current_listings",[]):
-            if old_l["id"] not in current_ids_new:
+            if old_l["id"] in new_ids:
+                continue  # ogłoszenie zostało znalezione w tym scanie — obsłużone w new_listings
+            prev_missing = int(old_l.get("missing_count", 0) or 0)
+            new_missing = prev_missing + 1
+            if new_missing >= 2:
+                # Druga nieobecność z rzędu → archiwizacja
                 old_l["archived_date"] = now_str
+                old_l.pop("missing_count", None)  # czyścimy przed archiwizacją
                 r_hist = old_l.get("reactivation_history",[])
                 if r_hist and "active_to_current" not in r_hist[-1]:
                     r_hist[-1]["active_to_current"] = now_str
@@ -833,9 +883,19 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 if not old_l.get("refresh_count"):   old_l["refresh_count"] = len(old_l["refresh_history"])
                 pd_["archived_listings"].append(old_l)
                 newly_archived.append(old_l)
+                log.info(f"  [ARCHIVED] {old_l['id']} (missing 2× z rzędu): {old_l.get('title','')[:50]}")
+            else:
+                # Pierwsza nieobecność → trzymamy w current_listings z markerem
+                old_l["missing_count"] = new_missing
+                carried_missing.append(old_l)
+                log.info(f"  [MISSING 1×] {old_l['id']}: {old_l.get('title','')[:50]}")
 
         if len(pd_["archived_listings"]) > 500:
             pd_["archived_listings"] = pd_["archived_listings"][-500:]
+
+        # Reset missing_count dla ogłoszeń, które wróciły (są w new_listings)
+        for nl in new_listings:
+            nl["missing_count"] = 0
 
         # ── Count refreshes & reactivations today ──
         reactivated_count = 0; refreshed_count = 0
@@ -849,7 +909,8 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             te["reactivated_count"] = reactivated_count
             te["refreshed_count"]   = refreshed_count
 
-        pd_["current_listings"] = new_listings
+        # current_listings = realnie znalezione + carry-over (missing 1×)
+        pd_["current_listings"] = new_listings + carried_missing
         scan_entry["profiles"][pk] = {"count": result["count"], "crosscheck": crosscheck}
 
         # Zapisz flow stats per profil
