@@ -1,5 +1,5 @@
 {
-  "total_scans": 19,
+  "total_scans": 20,
   "scans": [
     {
       "timestamp": "2026-05-01T09:05:26Z",
@@ -296,6 +296,27 @@
           "listings_total": 599,
           "listings_new": 9,
           "listings_removed": 23,
+          "crosscheck": "passed"
+        }
+      ],
+      "error": null
+    },
+    {
+      "timestamp": "2026-05-18T11:10:35Z",
+      "timestamp_local": "2026-05-18 11:10:35",
+      "status": "success",
+      "duration_seconds": 11,
+      "listings_total": 0,
+      "listings_new": null,
+      "listings_removed": null,
+      "scan_number": 20,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "mieszkania_lublin",
+          "listings_total": 0,
+          "listings_new": null,
+          "listings_removed": null,
           "crosscheck": "passed"
         }
       ],

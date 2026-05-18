@@ -35262,7 +35262,17 @@
           "crosscheck": "passed"
         }
       }
+    },
+    {
+      "timestamp": "2026-05-18 11:10:35",
+      "date": "2026-05-18",
+      "profiles": {
+        "mieszkania_lublin": {
+          "count": 0,
+          "crosscheck": "passed"
+        }
+      }
     }
   ],
-  "last_scan": "2026-05-17 09:09:26"
+  "last_scan": "2026-05-18 11:10:35"
 }
