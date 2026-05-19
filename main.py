@@ -96,8 +96,16 @@ if __name__ == "__main__":
         # Jeśli żaden profil nie miał danych flow (np. pierwszy scan) — ustaw None
         has_flow = any(p["listings_new"] is not None for p in profiles)
 
+        # Wykryj anomaly_detected — jeśli WSZYSTKIE profile są anomalią → status: anomaly_detected
+        anomaly_profiles = [p for p in profiles if p.get("crosscheck") == "anomaly_detected"]
+        scan_status = "success"
+        if anomaly_profiles and len(anomaly_profiles) == len(profiles):
+            scan_status = "anomaly_detected"
+        elif anomaly_profiles:
+            scan_status = "partial_anomaly"
+
         status.update({
-            "status":           "success",
+            "status":           scan_status,
             "duration_seconds": duration,
             "listings_total":   listings_total,
             "listings_new":     listings_new     if has_flow else None,

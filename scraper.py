@@ -407,10 +407,94 @@ def scrape_profile(profile_key, profile_config, session):
             unique.append(l)
     return {"listings": unique, "count": len(unique), "header_count": header_count, "pages_scraped": page-1}
 
+# ── Sanity checks (zapora przed pustymi / fałszywymi scanami) ──────────────
+# 4 zabezpieczenia chronią przed sytuacją, gdy OLX zwróci CAPTCHA / pustą stronę
+# / błąd po stronie sieci i scan zostanie uznany za udany.
+SANITY_MIN_COUNT       = 50      # poniżej traktujemy jako uszkodzenie (kategoria zwykle 500-700)
+SANITY_MIN_HEADER      = 10      # header_count < 10 to znak, że strona się nie załadowała
+SANITY_MIN_DURATION_S  = 30      # scan poniżej 30s = CAPTCHA-page lub redirect (nie pełna paginacja)
+SANITY_MAX_DROP_RATIO  = 0.40    # spadek > 40% vs ostatni udany scan = czerwona flaga
+COOLDOWN_AFTER_ANOMALY = 90      # sekundy pauzy przed retry po wykryciu anomalii
+
+def _previous_good_count(profile_key):
+    """Czyta ostatni udany count z data/dashboard_data.json (daily_counts)."""
+    try:
+        with open(JSON_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+        dc = d.get("profiles", {}).get(profile_key, {}).get("daily_counts", [])
+        # Bierzemy ostatni count > 0 (ignorujemy potencjalnie uszkodzone)
+        for entry in reversed(dc):
+            c = entry.get("count", 0)
+            if c and c > 0:
+                return c
+    except Exception:
+        pass
+    return None
+
+def _check_sanity(profile_key, result, duration_s, previous_count):
+    """Weryfikuje wynik scanu względem 4 warunków zdrowia.
+    Zwraca (ok: bool, reasons: list[str])."""
+    count  = result.get("count", 0)
+    header = result.get("header_count")
+    reasons = []
+    # 1) count == 0 → ZAWSZE error (niezależnie od header_count)
+    if count == 0:
+        reasons.append(f"count=0 (puste wyniki)")
+    # 2) count < SANITY_MIN_COUNT
+    elif count < SANITY_MIN_COUNT:
+        reasons.append(f"count={count} < {SANITY_MIN_COUNT} (próg minimum)")
+    # 3) header_count < SANITY_MIN_HEADER (gdy znany)
+    if header is not None and header < SANITY_MIN_HEADER:
+        reasons.append(f"header_count={header} < {SANITY_MIN_HEADER}")
+    # 4) czas trwania
+    if duration_s is not None and duration_s < SANITY_MIN_DURATION_S:
+        reasons.append(f"duration={duration_s:.1f}s < {SANITY_MIN_DURATION_S}s (zbyt szybko)")
+    # 5) spadek > 40% vs poprzedni udany scan
+    if previous_count and count > 0:
+        drop_ratio = (previous_count - count) / previous_count
+        if drop_ratio > SANITY_MAX_DROP_RATIO:
+            reasons.append(f"spadek {drop_ratio*100:.1f}% vs poprzedni count={previous_count}")
+    return (len(reasons) == 0, reasons)
+
 def scrape_with_crosscheck(profile_key, profile_config):
     log.info(f"[SCAN] Crosscheck: {profile_key}")
+    prev_count = _previous_good_count(profile_key)
+    log.info(f"  [{profile_key}] Poprzedni udany count: {prev_count}")
+
+    # ── Pierwsza próba ──
+    t0 = time.time()
     r1 = scrape_profile(profile_key, profile_config, get_session())
+    d1 = time.time() - t0
+    r1["duration_s"] = round(d1, 1)
     scraped, header = r1["count"], r1["header_count"]
+    log.info(f"  [{profile_key}] Próba 1: count={scraped}, header={header}, duration={d1:.1f}s")
+
+    # Sanity check próby 1
+    ok1, reasons1 = _check_sanity(profile_key, r1, d1, prev_count)
+    if not ok1:
+        log.warning(f"[SANITY-FAIL] {profile_key} (próba 1): {' | '.join(reasons1)}")
+        log.info(f"[COOLDOWN] {profile_key}: pauza {COOLDOWN_AFTER_ANOMALY}s przed retry...")
+        time.sleep(COOLDOWN_AFTER_ANOMALY)
+        # ── Retry po cooldown ──
+        t0 = time.time()
+        r2 = scrape_profile(profile_key, profile_config, get_session())
+        d2 = time.time() - t0
+        r2["duration_s"] = round(d2, 1)
+        log.info(f"  [{profile_key}] Próba 2 (po cooldown): count={r2['count']}, header={r2['header_count']}, duration={d2:.1f}s")
+        ok2, reasons2 = _check_sanity(profile_key, r2, d2, prev_count)
+        if not ok2:
+            # Bezpieczny exit: oznaczamy jako anomaly_detected — main.py NIE zmodyfikuje dashboard_data.json
+            log.error(f"[ANOMALY] {profile_key}: scan odrzucony (próba 2 też zła: {' | '.join(reasons2)})")
+            r2["crosscheck"] = "anomaly_detected"
+            r2["anomaly_reasons"] = reasons2
+            r2["previous_good_count"] = prev_count
+            return r2
+        # Retry udany — kontynuujemy crosscheck na r2
+        log.info(f"[RECOVERY] {profile_key}: retry po cooldown przeszedł sanity, kontynuuję crosscheck")
+        r1 = r2
+        scraped, header = r1["count"], r1["header_count"]
+
+    # ── Crosscheck (header vs scraped) ──
     # OLX miesza ~38% kart Otodom w wynikach kategorii — tolerancja musi to uwzględniać.
     # Dla kategorii: do 50% różnicy to normalne zachowanie OLX.
     tolerance = int(header * 0.50) if (profile_config.get("is_category") and header) else 10
@@ -418,10 +502,21 @@ def scrape_with_crosscheck(profile_key, profile_config):
         log.info(f"[CROSSCHECK] {profile_key}: PASS (scraped={scraped}, header={header})")
         r1["crosscheck"] = "passed"
         return r1
+
     log.info(f"[CROSSCHECK] {profile_key}: MISMATCH scraped={scraped} vs header={header}, retrying...")
     time.sleep(random.uniform(3, 5))
+    t0 = time.time()
     r2 = scrape_profile(profile_key, profile_config, get_session())
+    r2["duration_s"] = round(time.time() - t0, 1)
     c1, c2 = r1["count"], r2["count"]
+
+    # Sanity check na r2 też — żeby best_of_two nie wpychało zerowego scanu
+    ok_r2, _ = _check_sanity(profile_key, r2, r2["duration_s"], prev_count)
+    if not ok_r2:
+        log.warning(f"[CROSSCHECK] {profile_key}: r2 nie przeszło sanity, używam r1")
+        r1["crosscheck"] = "best_of_two"
+        return r1
+
     if header is not None:
         if abs(c2-header) < abs(c1-header):
             r2["crosscheck"] = "passed_retry"; return r2
@@ -653,13 +748,22 @@ def generate_dashboard_json(scan_results, scan_timestamp):
 
         crosscheck   = result.get("crosscheck","")
         header_count = result.get("header_count")
-        is_scraper_error = (crosscheck == "error" or (result["count"] == 0 and header_count is None))
+        # SAFETY: Każda z poniższych sytuacji oznacza uszkodzony scan, którego NIE wolno propagować:
+        # 1) crosscheck == "error"  — wyjątek podczas scrapowania
+        # 2) crosscheck == "anomaly_detected" — sanity check wykrył anomalię (count=0, spadek>40%, itp.)
+        # 3) count == 0 — pusty scan jest ZAWSZE błędem (niezależnie od header_count)
+        is_scraper_error = (
+            crosscheck in ("error", "anomaly_detected")
+            or result["count"] == 0
+        )
         current_listings_count = len(pd_.get("current_listings",[]))
         skip_daily_update = is_scraper_error and current_listings_count > 0
 
         if skip_daily_update:
-            log.warning(f"[{pk}] Skipping update — scraper error (crosscheck={crosscheck}, header={header_count})")
+            log.warning(f"[{pk}] Skipping update — scraper error (crosscheck={crosscheck}, count={result['count']}, header={header_count})")
             scan_entry["profiles"][pk] = {"count": result["count"], "crosscheck": crosscheck}
+            if result.get("anomaly_reasons"):
+                scan_entry["profiles"][pk]["anomaly_reasons"] = result["anomaly_reasons"]
             continue
 
         # ── Promoted & flow stats ──
@@ -768,6 +872,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
 
         old_map      = {l["id"]: l for l in pd_.get("current_listings",[])}
         archived_map = {l["id"]: l for l in pd_.get("archived_listings",[])}
+        reactivated_ids = set()  # ID-ki przeniesione z archived → current; usuniemy je z archived na końcu
 
         for nl in new_listings:
             lid = nl["id"]
@@ -837,6 +942,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
 
             elif lid in archived_map:
                 # Reactivation
+                reactivated_ids.add(lid)
                 old_archived = archived_map[lid]
                 nl["first_seen"] = old_archived.get("first_seen", now_str)
                 history = old_archived.get("reactivation_history",[])
@@ -892,6 +998,17 @@ def generate_dashboard_json(scan_results, scan_timestamp):
 
         if len(pd_["archived_listings"]) > 500:
             pd_["archived_listings"] = pd_["archived_listings"][-500:]
+
+        # ── Czyszczenie: usuń z archived te, które właśnie reaktywowano ──
+        # Bez tego ta sama oferta istnieje w obu listach (current + archived) — bug do 2026-05-19.
+        if reactivated_ids:
+            before = len(pd_["archived_listings"])
+            pd_["archived_listings"] = [
+                l for l in pd_["archived_listings"] if l["id"] not in reactivated_ids
+            ]
+            removed = before - len(pd_["archived_listings"])
+            if removed:
+                log.info(f"  [DEDUPE] {pk}: usunięto {removed} reaktywowanych ofert z archived_listings")
 
         # Reset missing_count dla ogłoszeń, które wróciły (są w new_listings)
         for nl in new_listings:
