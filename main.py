@@ -13,8 +13,10 @@ from datetime import datetime, timezone
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 STATUS_PATH  = os.path.join(DATA_DIR, "scan_status.json")
 HISTORY_PATH = os.path.join(DATA_DIR, "scan_history.json")
+API_PATH     = os.path.join(DATA_DIR, "api.json")
 
 MAX_HISTORY_ENTRIES = 50
+API_SCAN_ENTRIES    = 3
 
 
 def load_scan_history():
@@ -37,6 +39,44 @@ def save_history(history_data):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(HISTORY_PATH, "w", encoding="utf-8") as f:
         json.dump(history_data, f, ensure_ascii=False, indent=2)
+
+
+def save_api(status_data, history_data):
+    """Generuje uproszczony plik api.json: łączna liczba ogłoszeń + 3 ostatnie scany."""
+    profile_key = "mieszkania_lublin"
+
+    def _extract_scan(entry):
+        profiles = {p["key"]: p for p in entry.get("profiles", [])}
+        p = profiles.get(profile_key, {})
+        added   = p.get("listings_new")
+        removed = p.get("listings_removed")
+        return {
+            "date":           entry["timestamp"][:10],
+            "timestamp":      entry["timestamp"],
+            "total_listings": p.get("listings_total") or entry.get("listings_total"),
+            "added":          added,
+            "removed":        removed,
+        }
+
+    # Bierzemy ostatnie 3 udane scany z historii (najnowszy ostatni → odwróć do newest-first)
+    successful = [s for s in history_data.get("scans", []) if s.get("status") == "success"]
+    last_three = [_extract_scan(s) for s in successful[-API_SCAN_ENTRIES:]]
+    last_three.reverse()
+
+    # Bieżący total z właśnie zakończonego scanu
+    current_profiles = {p["key"]: p for p in status_data.get("profiles", [])}
+    cp = current_profiles.get(profile_key, {})
+    total_now = cp.get("listings_total") or status_data.get("listings_total")
+
+    api_data = {
+        "last_updated":   status_data["timestamp"],
+        "total_listings": total_now,
+        "scans":          last_three,
+    }
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(API_PATH, "w", encoding="utf-8") as f:
+        json.dump(api_data, f, ensure_ascii=False, indent=2)
 
 
 def build_profiles_summary(results):
@@ -151,6 +191,7 @@ if __name__ == "__main__":
         history["scans"] = history["scans"][-MAX_HISTORY_ENTRIES:]
 
     save_history(history)
+    save_api(status, history)
 
     # Wynik w logach GitHub Actions
     if status["status"] == "success":
