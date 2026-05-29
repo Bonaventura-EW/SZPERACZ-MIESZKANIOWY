@@ -1,0 +1,73 @@
+SZPERACZ MIESZKANIOWY — Nowe API (uproszczone)
+==============================================
+
+ENDPOINT
+--------
+GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/api.json
+
+Plik jest generowany automatycznie po każdym scanie (codziennie ~9:00 CET).
+Żadnej autentykacji nie wymaga.
+
+
+STRUKTURA ODPOWIEDZI
+--------------------
+{
+  "last_updated":   "2026-05-29T10:51:27Z",   // czas ostatniego scanu (UTC, ISO 8601)
+  "total_listings": 591,                        // łączna liczba ogłoszeń (aktualny stan)
+  "scans": [                                   // 3 ostatnie udane scany, od najnowszego
+    {
+      "date":           "2026-05-29",           // data scanu (YYYY-MM-DD)
+      "timestamp":      "2026-05-29T10:51:27Z", // dokładny czas scanu (UTC)
+      "total_listings": 591,                    // łączna liczba ogłoszeń w tym scanie
+      "added":          32,                     // ile ogłoszeń przybyło vs poprzedni scan
+      "removed":        48                      // ile ogłoszeń zniknęło vs poprzedni scan
+    },
+    { ... },  // scan sprzed 2 dni
+    { ... }   // scan sprzed 3 dni
+  ]
+}
+
+
+OPIS PÓL
+---------
+last_updated      — timestamp ostatniego scanu (UTC). Identyczny z scans[0].timestamp.
+total_listings    — liczba aktywnych ogłoszeń po ostatnim scanie (profil: Mieszkania na wynajem — Lublin).
+scans[]           — tablica maksymalnie 3 ostatnich udanych scanów, posortowana od najnowszego.
+  date            — data scanu w formacie YYYY-MM-DD.
+  timestamp       — dokładny czas scanu w UTC (ISO 8601).
+  total_listings  — całkowita liczba ogłoszeń w momencie tego scanu.
+  added           — liczba nowych ogłoszeń wykrytych w tym scanie (null przy pierwszym scanie w historii).
+  removed         — liczba ogłoszeń, które zniknęły od poprzedniego scanu (null przy pierwszym scanie).
+
+
+UWAGI
+-----
+- Plik zawiera tylko 3 ostatnie UDANE scany (scany z błędem są pomijane).
+- Przy pierwszym scanie w historii pola "added" i "removed" mają wartość null.
+- "added" i "removed" są liczone na podstawie ID ogłoszeń (nie różnicy liczb), więc są dokładne.
+- Dane dotyczą wyłącznie profilu: Mieszkania na wynajem — Lublin (OLX).
+
+
+HARMONOGRAM AKTUALIZACJI
+------------------------
+Scan codzienny:  ~9:00 CET  (workflow scan.yml)
+Scan backup:     ~11:00 UTC jeśli poranny scan nie przeszedł (workflow failsafe.yml)
+Scan ręczny:     dowolny moment (GitHub Actions → workflow_dispatch)
+
+
+PRZYKŁADOWE UŻYCIE (curl)
+--------------------------
+# Cache-bust żeby uniknąć starych danych:
+curl "https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/api.json?t=$(date +%s)"
+
+
+POWIĄZANE ENDPOINTY (istniejące)
+----------------------------------
+scan_status.json   — pełny wynik ostatniego scanu (status, błędy, czas trwania)
+  https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/scan_status.json
+
+scan_history.json  — historia ostatnich 50 scanów (szczegółowa)
+  https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/scan_history.json
+
+dashboard_data.json — pełne dane ogłoszeń (duży plik, dla dashboardu)
+  https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/dashboard_data.json

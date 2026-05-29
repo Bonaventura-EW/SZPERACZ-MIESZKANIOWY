@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.2.0] — 2026-05-29
+
+### ✨ Feature: Nowy uproszczony endpoint API — data/api.json
+- Dodano generowanie `data/api.json` po każdym scanie (w `main.py`).
+- Plik zawiera: łączną liczbę ogłoszeń (`total_listings`) oraz 3 ostatnie udane scany z datą, liczbą ogłoszeń, przybyłymi i ubyłymi (`added`, `removed`).
+- Scany posortowane od najnowszego; pola `added`/`removed` = null przy pierwszym scanie w historii.
+- Dane dotyczą profilu `mieszkania_lublin` (Mieszkania na wynajem — Lublin).
+- Dodano `API_INFO.txt` z pełną dokumentacją nowego endpointu.
+
 ## [1.1.0] — 2026-05-16
 
 ### 🐛 Fix: Paginacja ucinała ostatnie strony OLX
