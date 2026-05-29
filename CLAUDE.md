@@ -132,4 +132,4 @@ Git commit po scanie: `git add data/` (nie `git add -A` — docs/ i kod nie maj�
 
 - `JAK_DZIALA_SYSTEM.md` — pełna dokumentacja architektury (używana też jako szablon dla nowych instancji)
 - `API.md` — dokumentacja publicznych endpointów JSON (scan_status, scan_history)
-- `CHANGELOG.md` — format Keep a Changelog; aktualizuj przy każdej zmianie kodu
+- `CHANGELOG.md` — format Keep a Changelog; **aktualizuj przy każdej zmianie kodu** — bez wyjątku. Emoji prefix: 📧 Email, 🐛 Fix, ✨ Feature, 📊 Chart, ⚙️ Workflow, 🛡️ Guard/Safety. Każdy commit dotyczący kodu musi mieć odpowiadający wpis w CHANGELOG.md.
