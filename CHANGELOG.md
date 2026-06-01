@@ -9,6 +9,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 - Usunięto martwy blok „last price edge case" — dowiedziono, że po pętli `s > mx`, więc dodawał zawsze `0`. Test własnościowy (500 losowych zestawów) potwierdza niezmiennik: suma liczników słupków == liczba ofert z ceną.
 - Dodano `tests/test_scraper.py` (17 testów, bez sieci): `parse_price`, `parse_date_text`, `extract_listing_id`, `_check_sanity` (wszystkie 5 zapór), `build_price_distribution`.
 
+### ⚙️ Workflow/Config: Hardening
+- Ujednolicono wersję Pythona we wszystkich workflowach na **3.12** (`weekly_report.yml` używał 3.11).
+- `scan.yml`: doprecyzowano komentarz cron — `07:00 UTC` = 9:00 latem (CEST) / 8:00 zimą (CET); pominięty scan łapie `failsafe.yml`.
+- Rozszerzono `.gitignore` (`.venv`, `.pytest_cache`, `*.pyc`, pliki tymczasowe Excela `~$*.xlsx` itd.).
+- `requirements.txt`: komentarz wyjaśniający rolę `brotli` (dekodowanie `br`).
+
 ## [1.3.0] — 2026-06-01
 
 ### 🛡️ Fix: Zatrzymanie niekontrolowanego wzrostu plików danych (Excel/JSON)
