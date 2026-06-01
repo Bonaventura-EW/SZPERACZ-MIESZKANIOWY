@@ -24,7 +24,7 @@ GitHub Actions (scheduler)
         ▼
     main.py  ──── scraper.py ──► OLX (HTTP requests + BeautifulSoup)
         │
-        ├──► data/szperacz_olx.xlsx     (historia Excel)
+        ├──► data/szperacz_mieszkaniowy.xlsx     (historia Excel)
         ├──► data/dashboard_data.json   (dane dla dashboardu)
         │
         ▼
@@ -43,7 +43,7 @@ GitHub Actions (scheduler)
 | `main.py` | Punkt wejścia (uruchamia scraper) |
 | `docs/index.html` | Dashboard (GitHub Pages, czysty HTML+JS) |
 | `data/dashboard_data.json` | Dane dla dashboardu (commitowane do repo) |
-| `data/szperacz_olx.xlsx` | Pełna historia w Excelu |
+| `data/szperacz_mieszkaniowy.xlsx` | Pełna historia w Excelu |
 | `.github/workflows/scan.yml` | Codzienny scan (GitHub Actions) |
 | `.github/workflows/weekly_report.yml` | Tygodniowy email (GitHub Actions) |
 

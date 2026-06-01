@@ -568,13 +568,34 @@ def get_or_create_sheet(wb, name, headers):
     style_header_row(ws, 1, len(headers))
     return ws
 
+MAX_SUMMARY_ROWS = 365  # ~rok historii liczników w arkuszu profilu (1 wiersz/scan)
+
+def _read_summary_rows(ws):
+    """Czyta wiersze podsumowania (1/scan) z arkusza profilu.
+    Wiersz podsumowania rozpoznajemy po liczbie w kolumnie 3 (Liczba ogłoszeń);
+    wiersze ogłoszeń mają tu None, więc są pomijane."""
+    rows = []
+    for row in range(2, ws.max_row + 1):
+        c3 = ws.cell(row=row, column=3).value
+        if isinstance(c3, (int, float)):
+            rows.append({
+                "date":   ws.cell(row=row, column=1).value,
+                "time":   ws.cell(row=row, column=2).value,
+                "count":  int(c3),
+                "change": ws.cell(row=row, column=4).value,
+                "cross":  ws.cell(row=row, column=5).value,
+            })
+    return rows
+
 def update_excel(scan_results, scan_timestamp):
     os.makedirs(DATA_DIR, exist_ok=True)
     wb = load_or_create_workbook()
     today   = scan_timestamp.strftime("%Y-%m-%d")
     now_str = scan_timestamp.strftime("%Y-%m-%d %H:%M")
 
-    # Load refresh counts from JSON
+    # Wczytaj stan JSON (refresh_count + price_history) — zapisany wcześniej przez
+    # generate_dashboard_json (MUSI być wywołany przed update_excel).
+    jd = {}
     refresh_count_map = {}
     if os.path.exists(JSON_PATH):
         try:
@@ -583,7 +604,8 @@ def update_excel(scan_results, scan_timestamp):
             for pk, pd_ in jd.get("profiles", {}).items():
                 for listing in pd_.get("current_listings", []):
                     refresh_count_map[listing.get("id","")] = listing.get("refresh_count", 0)
-        except Exception: pass
+        except Exception:
+            jd = {}
 
     profile_headers = [
         "Data scanu","Godzina","Liczba ogłoszeń","Zmiana vs poprzedni","Crosscheck",
@@ -592,27 +614,39 @@ def update_excel(scan_results, scan_timestamp):
     ]
 
     for pk, result in scan_results.items():
-        ws = get_or_create_sheet(wb, pk[:31], profile_headers)
-        prev_count = None
-        for row in range(ws.max_row, 1, -1):
-            val = ws.cell(row=row, column=3).value
-            if val is not None and isinstance(val, (int,float)):
-                prev_count = int(val); break
+        sheet_name = pk[:31]
+        # Zachowaj dotychczasową serię liczników (1 wiersz/scan), potem przebuduj arkusz
+        # od zera — dzięki temu snapshot ogłoszeń NIE kumuluje się między scanami.
+        old_summary = _read_summary_rows(wb[sheet_name]) if sheet_name in wb.sheetnames else []
+        prev_count  = old_summary[-1]["count"] if old_summary else None
+        if sheet_name in wb.sheetnames:
+            del wb[sheet_name]
+        ws = get_or_create_sheet(wb, sheet_name, profile_headers)
+
         cur = result["count"]
         ch  = cur - prev_count if prev_count is not None else 0
-        nr  = ws.max_row + 1
-        if nr > 2: nr += 1
+        old_summary.append({"date": today, "time": scan_timestamp.strftime("%H:%M"),
+                            "count": cur, "change": ch, "cross": result.get("crosscheck","")})
+        if len(old_summary) > MAX_SUMMARY_ROWS:
+            old_summary = old_summary[-MAX_SUMMARY_ROWS:]
 
-        ws.cell(row=nr, column=1, value=today)
-        ws.cell(row=nr, column=2, value=scan_timestamp.strftime("%H:%M"))
-        ws.cell(row=nr, column=3, value=cur)
-        f = UP_FONT if ch > 0 else DOWN_FONT if ch < 0 else DATA_FONT
-        style_data_cell(ws.cell(row=nr, column=4, value=ch), f)
-        ws.cell(row=nr, column=5, value=result.get("crosscheck",""))
-        for c in [1,2,3,5]: style_data_cell(ws.cell(row=nr, column=c))
+        # Blok podsumowań — pełna seria liczników (ograniczona do MAX_SUMMARY_ROWS).
+        srow = 1
+        for s in old_summary:
+            srow += 1
+            ws.cell(row=srow, column=1, value=s["date"])
+            ws.cell(row=srow, column=2, value=s["time"])
+            ws.cell(row=srow, column=3, value=s["count"])
+            sf = UP_FONT if (isinstance(s["change"],(int,float)) and s["change"] > 0) \
+                 else DOWN_FONT if (isinstance(s["change"],(int,float)) and s["change"] < 0) else DATA_FONT
+            style_data_cell(ws.cell(row=srow, column=4, value=s["change"]), sf)
+            ws.cell(row=srow, column=5, value=s["cross"])
+            for c in [1,2,3,5]: style_data_cell(ws.cell(row=srow, column=c))
 
+        # Snapshot bieżących ogłoszeń — przebudowywany co scan (pusty wiersz separatora).
+        snapshot_start = srow + 2
         for i, listing in enumerate(result["listings"]):
-            row = nr + 1 + i
+            row = snapshot_start + i
             pub, ref = parse_date_text(listing.get("date_text",""))
             lid = listing["listing_id"]
             is_promoted = listing.get("is_promoted", False)
@@ -647,35 +681,38 @@ def update_excel(scan_results, scan_timestamp):
         for idx, w in enumerate(widths, 1):
             ws.column_dimensions[get_column_letter(idx)].width = w
 
-    # Historia cen
+    # Historia cen — odbudowywana z price_history (JSON = źródło prawdy zmian cen).
+    # Rejestruje wyłącznie realne zmiany ceny; rozmiar ograniczony trymowaniem
+    # price_history (90 dni) w generate_dashboard_json — arkusz już nie puchnie.
     ph = ["Data","Profil","ID ogłoszenia","Tytuł","Cena (zł)","Poprzednia cena","Zmiana ceny","URL"]
+    if "historia_cen" in wb.sheetnames: del wb["historia_cen"]
     ws_p = get_or_create_sheet(wb, "historia_cen", ph)
-    prev_prices = {}
-    for row in range(2, ws_p.max_row+1):
-        lid   = ws_p.cell(row=row, column=3).value
-        price = ws_p.cell(row=row, column=5).value
-        if lid and price is not None:
-            prev_prices[lid] = int(price) if isinstance(price,(int,float)) else None
+    title_url = {}
     for pk, result in scan_results.items():
-        for listing in result["listings"]:
-            lid = listing["listing_id"]
-            cp  = listing["price"]
-            pp  = prev_prices.get(lid)
-            pc  = (cp - pp) if (pp is not None and cp is not None) else None
-            r   = ws_p.max_row + 1
-            ws_p.cell(row=r, column=1, value=now_str)
-            ws_p.cell(row=r, column=2, value=pk)
-            ws_p.cell(row=r, column=3, value=lid)
-            ws_p.cell(row=r, column=4, value=listing["title"])
-            ws_p.cell(row=r, column=5, value=cp)
-            ws_p.cell(row=r, column=6, value=pp)
-            ws_p.cell(row=r, column=7, value=pc)
-            ws_p.cell(row=r, column=8, value=listing["url"])
-            for c in range(1,9):
-                cell = ws_p.cell(row=r, column=c)
-                cf = DOWN_FONT if (c==7 and pc and pc<0) else UP_FONT if (c==7 and pc and pc>0) else DATA_FONT
-                style_data_cell(cell, cf)
-            if cp is not None: prev_prices[lid] = cp
+        for l in result["listings"]:
+            title_url[l["listing_id"]] = (l["title"], l["url"])
+    for pk_, pdata in jd.get("profiles", {}).items():
+        for l in pdata.get("current_listings", []) + pdata.get("archived_listings", []):
+            title_url.setdefault(l.get("id",""), (l.get("title",""), l.get("url","")))
+    rp = 1
+    for pk_, pdata in jd.get("profiles", {}).items():
+        for lid, hist in pdata.get("price_history", {}).items():
+            t, u = title_url.get(lid, ("",""))
+            for h in hist:
+                rp += 1
+                chg = h.get("change")
+                ws_p.cell(row=rp, column=1, value=h.get("date"))
+                ws_p.cell(row=rp, column=2, value=pk_)
+                ws_p.cell(row=rp, column=3, value=lid)
+                ws_p.cell(row=rp, column=4, value=t)
+                ws_p.cell(row=rp, column=5, value=h.get("new_price"))
+                ws_p.cell(row=rp, column=6, value=h.get("old_price"))
+                ws_p.cell(row=rp, column=7, value=chg)
+                ws_p.cell(row=rp, column=8, value=u)
+                for c in range(1,9):
+                    cell = ws_p.cell(row=rp, column=c)
+                    cf = DOWN_FONT if (c==7 and chg and chg<0) else UP_FONT if (c==7 and chg and chg>0) else DATA_FONT
+                    style_data_cell(cell, cf)
     for idx, w in enumerate([18,18,15,50,12,14,12,60],1):
         ws_p.column_dimensions[get_column_letter(idx)].width = w
 
@@ -720,6 +757,30 @@ def load_existing_json():
         except (json.JSONDecodeError, IOError): pass
     return {"profiles":{}, "scan_history":[], "last_scan":None}
 
+def build_price_distribution(listings):
+    """Histogram cen aktywnych ofert (~14 słupków o „ładnym" kroku).
+    Niezmiennik: suma count w słupkach == liczba ofert z dodatnią ceną."""
+    prices = sorted([l["price"] for l in listings if l.get("price") and l["price"] > 0])
+    if not prices:
+        return []
+    mn, mx = prices[0], prices[-1]
+    if mn == mx:
+        return [{"from": mn, "to": mx + 1, "count": len(prices)}]
+    raw = (mx - mn) / 14
+    mag = 10 ** int(len(str(int(raw))) - 1)
+    step = next((f * mag for f in [1, 2, 2.5, 5, 10] if f * mag >= raw), 10 * mag)
+    start = (mn // step) * step
+    buckets = []
+    s = start
+    while s <= mx:
+        cnt = sum(1 for p in prices if p >= s and p < s + step)
+        buckets.append({"from": int(s), "to": int(s + step), "count": cnt})
+        s += step
+    # Przyciągnij puste krawędzie histogramu
+    while len(buckets) > 1 and buckets[-1]["count"] == 0: buckets.pop()
+    while len(buckets) > 1 and buckets[0]["count"] == 0:  buckets.pop(0)
+    return buckets
+
 def generate_dashboard_json(scan_results, scan_timestamp):
     data    = load_existing_json()
     now_str = scan_timestamp.strftime("%Y-%m-%d %H:%M:%S")
@@ -737,13 +798,9 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 "is_category": cfg.get("is_category", False),
                 "daily_counts": [], "current_listings": [],
                 "archived_listings": [], "price_history": {},
-                "promotion_history": {},
             }
 
         pd_ = data["profiles"][pk]
-        # Backward-compat: ensure promotion_history exists
-        if "promotion_history" not in pd_:
-            pd_["promotion_history"] = {}
         dc  = pd_["daily_counts"]
 
         crosscheck   = result.get("crosscheck","")
@@ -782,32 +839,6 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         promo_pct   = round(promo_count / total * 100, 1) if total > 0 else 0
 
         # Price distribution snapshot (all active listings with price)
-        def build_price_distribution(listings):
-            prices = sorted([l["price"] for l in listings if l.get("price") and l["price"] > 0])
-            if not prices:
-                return []
-            # Auto bucket step: aim for ~14 buckets, nice round number
-            mn, mx = prices[0], prices[-1]
-            if mn == mx:
-                return [{"from": mn, "to": mx + 1, "count": len(prices)}]
-            raw = (mx - mn) / 14
-            mag = 10 ** int(len(str(int(raw))) - 1)
-            step = next((f * mag for f in [1, 2, 2.5, 5, 10] if f * mag >= raw), 10 * mag)
-            start = (mn // step) * step
-            buckets = []
-            s = start
-            while s <= mx:
-                cnt = sum(1 for p in prices if p >= s and p < s + step)
-                buckets.append({"from": int(s), "to": int(s + step), "count": cnt})
-                s += step
-            # last price edge case
-            if prices[-1] >= s - step:
-                buckets[-1]["count"] += sum(1 for p in prices if p >= s)
-            # trim empty edges
-            while len(buckets) > 1 and buckets[-1]["count"] == 0: buckets.pop()
-            while len(buckets) > 1 and buckets[0]["count"] == 0:  buckets.pop(0)
-            return buckets
-
         price_dist = build_price_distribution(result["listings"])
 
         # Median from NEW listings only
@@ -914,8 +945,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                         })
                         log.info(f"  [REFRESHED] {lid}: odświeżeń={nl['refresh_count']}")
 
-                # Promotion tracking
-                if lid not in pd_["promotion_history"]: pd_["promotion_history"][lid] = []
+                # Promotion tracking (historia per-ogłoszenie żyje w nl["promotion_history"])
                 nl["promotion_history"]       = old.get("promotion_history",[])
                 nl["promoted_days_current"]   = old.get("promoted_days_current", 0)
                 nl["promoted_sessions_count"] = old.get("promoted_sessions_count", 0)
@@ -1028,6 +1058,18 @@ def generate_dashboard_json(scan_results, scan_timestamp):
 
         # current_listings = realnie znalezione + carry-over (missing 1×)
         pd_["current_listings"] = new_listings + carried_missing
+
+        # Trymowanie price_history do ostatnich 90 dni — ogranicza wzrost JSON.
+        # Porównanie stringów "%Y-%m-%d %H:%M:%S" jest chronologiczne leksykograficznie.
+        cutoff = (scan_timestamp - timedelta(days=90)).strftime("%Y-%m-%d %H:%M:%S")
+        ph_map = pd_.get("price_history", {})
+        for ph_lid in list(ph_map.keys()):
+            kept = [h for h in ph_map[ph_lid] if h.get("date", "") >= cutoff]
+            if kept:
+                ph_map[ph_lid] = kept
+            else:
+                del ph_map[ph_lid]
+
         scan_entry["profiles"][pk] = {"count": result["count"], "crosscheck": crosscheck}
 
         # Zapisz flow stats per profil

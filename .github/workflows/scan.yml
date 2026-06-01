@@ -2,7 +2,8 @@ name: SZPERACZ MIESZKANIOWY - Daily Scan
 
 on:
   schedule:
-    # 9:00 CET = 7:00 UTC (lato CEST)
+    # 07:00 UTC — latem (CEST) = 9:00, zimą (CET) = 8:00 czasu lokalnego.
+    # GitHub cron nie zna stref czasowych; ewentualny pominięty scan łapie failsafe.yml (11:00 UTC).
     - cron: '0 7 * * *'
 
   workflow_dispatch:

@@ -7,6 +7,7 @@ Uruchamia scan i zapisuje status API do data/scan_status.json i data/scan_histor
 import sys
 import json
 import os
+import argparse
 import traceback
 from datetime import datetime, timezone
 
@@ -100,6 +101,12 @@ def build_profiles_summary(results):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="SZPERACZ MIESZKANIOWY — uruchamia scan OLX i zapisuje status API.")
+    parser.add_argument("--scan", action="store_true",
+                        help="Uruchom scan (działanie domyślne — wywołanie bez argumentów też skanuje).")
+    parser.parse_args()  # walidacja argumentów; --scan to jedyny/domyślny tryb
+
     scan_start  = datetime.now(timezone.utc)
     scan_number = 1
 

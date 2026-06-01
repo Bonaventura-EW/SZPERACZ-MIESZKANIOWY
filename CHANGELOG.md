@@ -2,6 +2,38 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.4.0] — 2026-06-01
+
+### 🛡️ Refactor/Test: Testy jednostkowe + uproszczenie histogramu cen
+- `build_price_distribution()` wyciągnięta z `generate_dashboard_json()` na poziom modułu (testowalna).
+- Usunięto martwy blok „last price edge case" — dowiedziono, że po pętli `s > mx`, więc dodawał zawsze `0`. Test własnościowy (500 losowych zestawów) potwierdza niezmiennik: suma liczników słupków == liczba ofert z ceną.
+- Dodano `tests/test_scraper.py` (17 testów, bez sieci): `parse_price`, `parse_date_text`, `extract_listing_id`, `_check_sanity` (wszystkie 5 zapór), `build_price_distribution`.
+
+### ⚙️ Workflow/Config: Hardening
+- Ujednolicono wersję Pythona we wszystkich workflowach na **3.12** (`weekly_report.yml` używał 3.11).
+- `scan.yml`: doprecyzowano komentarz cron — `07:00 UTC` = 9:00 latem (CEST) / 8:00 zimą (CET); pominięty scan łapie `failsafe.yml`.
+- Rozszerzono `.gitignore` (`.venv`, `.pytest_cache`, `*.pyc`, pliki tymczasowe Excela `~$*.xlsx` itd.).
+- `requirements.txt`: komentarz wyjaśniający rolę `brotli` (dekodowanie `br`).
+
+## [1.3.0] — 2026-06-01
+
+### 🛡️ Fix: Zatrzymanie niekontrolowanego wzrostu plików danych (Excel/JSON)
+- `update_excel()` przebudowany: arkusz profilu trzyma teraz **pełną serię liczników** (1 wiersz/scan, limit `MAX_SUMMARY_ROWS = 365`) oraz **snapshot bieżących ogłoszeń przebudowywany co scan** zamiast kumulowania ~600 wierszy przy każdym uruchomieniu.
+- Arkusz `historia_cen` odbudowywany z `price_history` (JSON = źródło prawdy) — rejestruje wyłącznie realne zmiany ceny, nie powiela wszystkich ofert co scan.
+- Skutek: rozmiar Excela spadł z **4,06 MB → 95 KB**; przy symulacji 20 scanów arkusze są stabilne (~634 / 237 wierszy zamiast >12 000).
+- `generate_dashboard_json()`: dodano **trymowanie `price_history` do 90 dni** (analogicznie do `daily_counts` i `scan_history`).
+- Jednorazowa regeneracja `data/szperacz_mieszkaniowy.xlsx` — odchudzenie istniejącego pliku; `dashboard_data.json` nietknięty.
+
+### 🐛 Fix: Usunięcie martwej struktury `promotion_history` (top-level) — przeciek pamięci
+- Pole `pd_["promotion_history"]` na poziomie profilu tworzyło pustą listę dla każdego ID ogłoszenia, ale **nigdy do niej nie zapisywało** (realna historia promocji żyje w `nl["promotion_history"]` per-ogłoszenie). Rosło bez końca (1206 pustych kluczy).
+- Usunięto inicjalizację, blok backward-compat i zapis pustych list w `generate_dashboard_json()`. Historia promocji per-ogłoszenie pozostaje nietknięta.
+- Migracja danych: wyczyszczono 1206 pustych kluczy z `data/dashboard_data.json` (niepuste klucze byłyby zachowane — żadnych nie było).
+
+### 📝 Docs/Tooling: Spójność wejścia i dokumentacji
+- `main.py`: dodano `argparse` z flagą `--scan` (dotąd flaga była po cichu ignorowana). Nieznane argumenty zwracają teraz czytelny błąd, `--help` działa. Wywołanie bez argumentów nadal skanuje (kompatybilność wsteczna z workflow).
+- `JAK_DZIALA_SYSTEM.md`: poprawiono nieaktualną nazwę pliku Excela `szperacz_olx.xlsx` → `szperacz_mieszkaniowy.xlsx`.
+- `API.md`: dodano sekcję dokumentującą endpoint `data/api.json` (dotąd opisany tylko w `API_INFO.txt`).
+
 ## [1.2.0] — 2026-05-29
 
 ### ✨ Feature: Nowy uproszczony endpoint API — data/api.json
