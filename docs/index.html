@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SZPERACZ MIESZKANIOWY — Dashboard</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d0d14'/%3E%3Cpolygon points='32,10 54,30 50,30 50,54 14,54 14,30 10,30' fill='%2300e5ff' opacity='0.15'/%3E%3Cpolygon points='32,10 54,30 50,30 50,54 14,54 14,30 10,30' fill='none' stroke='%2300e5ff' stroke-width='2.5' stroke-linejoin='round'/%3E%3Crect x='24' y='38' width='10' height='16' rx='2' fill='%2300e5ff' opacity='0.4'/%3E%3Ccircle cx='43' cy='22' r='7' fill='none' stroke='%2300e5ff' stroke-width='2.5'/%3E%3Cline x1='48' y1='27' x2='54' y2='33' stroke='%2300e5ff' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js"></script>
+<!-- Biblioteki self-hostowane (docs/vendor) — brak zależności od zewnętrznych CDN -->
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/hammer.min.js"></script>
+<script src="vendor/chartjs-plugin-zoom.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -308,10 +309,6 @@ input[type=range].day-slider::-moz-range-thumb{
     </div>
   </div>
   <div class="topbar-right">
-    <button class="btn-scan" id="btnScan" onclick="openScanModal()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-      Scan teraz
-    </button>
     <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" title="Przełącz motyw">🌙</button>
   </div>
 </header>
@@ -427,21 +424,6 @@ input[type=range].day-slider::-moz-range-thumb{
 
 </main>
 
-<div class="modal-overlay" id="scanModal">
-  <div class="modal">
-    <div style="font-size:28px;margin-bottom:12px;">🔑</div>
-    <h3>Uruchom scan OLX</h3>
-    <p>Podaj GitHub PAT z uprawnieniem <strong>Actions: write</strong>.</p>
-    <p style="font-size:12px;"><a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" style="color:var(--accent)">Utwórz token →</a></p>
-    <input type="text" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-    <label class="modal-checkbox"><input type="checkbox" id="rememberToken"> Zapamiętaj token</label>
-    <div class="modal-buttons">
-      <button class="btn-modal btn-cancel" onclick="closeScanModal()">Anuluj</button>
-      <button class="btn-modal btn-confirm" onclick="triggerScan()">▶ Uruchom</button>
-    </div>
-  </div>
-</div>
-
 <div class="status-toast" id="toast"></div>
 
 <div class="footer">
@@ -455,7 +437,6 @@ input[type=range].day-slider::-moz-range-thumb{
 const GITHUB_OWNER = 'Bonaventura-EW';
 const GITHUB_REPO  = 'SZPERACZ-MIESZKANIOWY';
 const DATA_URL     = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/data/dashboard_data.json`;
-const WORKFLOW_FILE = 'scan.yml';
 
 let dashData      = null;
 let detailOpen    = false;
@@ -1104,39 +1085,6 @@ function initTheme() {
   }
 }
 
-// ─── Scan Modal ─────────────────────────────────────────────
-function openScanModal() {
-  document.getElementById('scanModal').classList.add('visible');
-  const saved = localStorage.getItem('szperacz-mieszkaniowy-token');
-  if (saved) { document.getElementById('ghToken').value=saved; document.getElementById('rememberToken').checked=true; }
-}
-function closeScanModal() { document.getElementById('scanModal').classList.remove('visible'); }
-
-async function triggerScan() {
-  const token = document.getElementById('ghToken').value.trim();
-  if (!token) { showToast('Podaj token GitHub','error'); return; }
-  if (document.getElementById('rememberToken').checked)
-    localStorage.setItem('szperacz-mieszkaniowy-token', token);
-  else localStorage.removeItem('szperacz-mieszkaniowy-token');
-
-  const btn = document.getElementById('btnScan');
-  btn.classList.add('scanning'); btn.textContent='⏳ Skanowanie...';
-  closeScanModal();
-  try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
-      {method:'POST', headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
-       body:JSON.stringify({ref:'main'})});
-    if (resp.status===204) {
-      showToast('✅ Scan uruchomiony! Dane zaktualizują się za ~3 min.','success');
-      setTimeout(()=>{loadData();showToast('📊 Dane odświeżone','info');}, 200000);
-    } else if (resp.status===401||resp.status===403) showToast('❌ Błąd autoryzacji — sprawdź token','error');
-    else showToast(`Błąd: HTTP ${resp.status}`,'error');
-  } catch(e) { showToast(`Błąd: ${e.message}`,'error'); }
-  btn.classList.remove('scanning');
-  btn.innerHTML = _btnScanOriginal;
-}
-
 function showToast(msg, type='info') {
   const t = document.getElementById('toast');
   t.textContent=msg; t.className=`status-toast ${type} visible`;
@@ -1144,7 +1092,6 @@ function showToast(msg, type='info') {
 }
 function esc(str) { const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
 
-const _btnScanOriginal = document.getElementById('btnScan').innerHTML;
 initTheme();
 loadData();
 setInterval(loadData, 300000);
