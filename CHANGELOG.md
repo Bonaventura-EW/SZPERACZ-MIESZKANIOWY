@@ -16,6 +16,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 - Usunięto inicjalizację, blok backward-compat i zapis pustych list w `generate_dashboard_json()`. Historia promocji per-ogłoszenie pozostaje nietknięta.
 - Migracja danych: wyczyszczono 1206 pustych kluczy z `data/dashboard_data.json` (niepuste klucze byłyby zachowane — żadnych nie było).
 
+### 📝 Docs/Tooling: Spójność wejścia i dokumentacji
+- `main.py`: dodano `argparse` z flagą `--scan` (dotąd flaga była po cichu ignorowana). Nieznane argumenty zwracają teraz czytelny błąd, `--help` działa. Wywołanie bez argumentów nadal skanuje (kompatybilność wsteczna z workflow).
+- `JAK_DZIALA_SYSTEM.md`: poprawiono nieaktualną nazwę pliku Excela `szperacz_olx.xlsx` → `szperacz_mieszkaniowy.xlsx`.
+- `API.md`: dodano sekcję dokumentującą endpoint `data/api.json` (dotąd opisany tylko w `API_INFO.txt`).
+
 ## [1.2.0] — 2026-05-29
 
 ### ✨ Feature: Nowy uproszczony endpoint API — data/api.json

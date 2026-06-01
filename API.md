@@ -117,6 +117,45 @@ GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/
 
 ---
 
+### 3. Uproszczone API — `api.json`
+
+```
+GET https://raw.githubusercontent.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY/main/data/api.json
+```
+
+Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + **3 ostatnie udane scany**. Generowany automatycznie po każdym scanie (`main.py`).
+
+#### Odpowiedź
+
+```json
+{
+  "last_updated": "2026-05-31T09:48:51Z",
+  "total_listings": 590,
+  "scans": [
+    { "date": "2026-05-31", "timestamp": "2026-05-31T09:48:51Z", "total_listings": 590, "added": 26, "removed": 32 },
+    { "date": "2026-05-30", "timestamp": "2026-05-30T09:23:55Z", "total_listings": 585, "added": 10, "removed": 26 },
+    { "date": "2026-05-29", "timestamp": "2026-05-29T18:35:46Z", "total_listings": 584, "added": 6,  "removed": 35 }
+  ]
+}
+```
+
+#### Opis pól
+
+| Pole | Typ | Opis |
+|------|-----|------|
+| `last_updated` | string | Czas ostatniego scanu (UTC, ISO 8601). Równy `scans[0].timestamp`. |
+| `total_listings` | int / null | Liczba aktywnych ogłoszeń po ostatnim scanie (profil `mieszkania_lublin`). |
+| `scans` | array | Maks. **3 ostatnie udane** scany, od najnowszego (scany z błędem pomijane). |
+| `scans[].date` | string | Data scanu `YYYY-MM-DD`. |
+| `scans[].timestamp` | string | Dokładny czas scanu (UTC). |
+| `scans[].total_listings` | int / null | Liczba ogłoszeń w momencie tego scanu. |
+| `scans[].added` | int / null | Nowe ogłoszenia vs poprzedni scan (`null` przy pierwszym scanie w historii). |
+| `scans[].removed` | int / null | Ogłoszenia, które zniknęły vs poprzedni scan (`null` przy pierwszym scanie). |
+
+> Pełna dokumentacja tego endpointu również w `API_INFO.txt`. Dane dotyczą wyłącznie profilu **Mieszkania na wynajem — Lublin**.
+
+---
+
 ## Opis pól
 
 ### Pola główne
