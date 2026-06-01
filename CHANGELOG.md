@@ -11,6 +11,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 - `generate_dashboard_json()`: dodano **trymowanie `price_history` do 90 dni** (analogicznie do `daily_counts` i `scan_history`).
 - Jednorazowa regeneracja `data/szperacz_mieszkaniowy.xlsx` — odchudzenie istniejącego pliku; `dashboard_data.json` nietknięty.
 
+### 🐛 Fix: Usunięcie martwej struktury `promotion_history` (top-level) — przeciek pamięci
+- Pole `pd_["promotion_history"]` na poziomie profilu tworzyło pustą listę dla każdego ID ogłoszenia, ale **nigdy do niej nie zapisywało** (realna historia promocji żyje w `nl["promotion_history"]` per-ogłoszenie). Rosło bez końca (1206 pustych kluczy).
+- Usunięto inicjalizację, blok backward-compat i zapis pustych list w `generate_dashboard_json()`. Historia promocji per-ogłoszenie pozostaje nietknięta.
+- Migracja danych: wyczyszczono 1206 pustych kluczy z `data/dashboard_data.json` (niepuste klucze byłyby zachowane — żadnych nie było).
+
 ## [1.2.0] — 2026-05-29
 
 ### ✨ Feature: Nowy uproszczony endpoint API — data/api.json

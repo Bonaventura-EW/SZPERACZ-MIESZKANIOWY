@@ -774,13 +774,9 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 "is_category": cfg.get("is_category", False),
                 "daily_counts": [], "current_listings": [],
                 "archived_listings": [], "price_history": {},
-                "promotion_history": {},
             }
 
         pd_ = data["profiles"][pk]
-        # Backward-compat: ensure promotion_history exists
-        if "promotion_history" not in pd_:
-            pd_["promotion_history"] = {}
         dc  = pd_["daily_counts"]
 
         crosscheck   = result.get("crosscheck","")
@@ -951,8 +947,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                         })
                         log.info(f"  [REFRESHED] {lid}: odświeżeń={nl['refresh_count']}")
 
-                # Promotion tracking
-                if lid not in pd_["promotion_history"]: pd_["promotion_history"][lid] = []
+                # Promotion tracking (historia per-ogłoszenie żyje w nl["promotion_history"])
                 nl["promotion_history"]       = old.get("promotion_history",[])
                 nl["promoted_days_current"]   = old.get("promoted_days_current", 0)
                 nl["promoted_sessions_count"] = old.get("promoted_sessions_count", 0)
