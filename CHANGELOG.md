@@ -2,6 +2,13 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.4.0] — 2026-06-01
+
+### 🛡️ Refactor/Test: Testy jednostkowe + uproszczenie histogramu cen
+- `build_price_distribution()` wyciągnięta z `generate_dashboard_json()` na poziom modułu (testowalna).
+- Usunięto martwy blok „last price edge case" — dowiedziono, że po pętli `s > mx`, więc dodawał zawsze `0`. Test własnościowy (500 losowych zestawów) potwierdza niezmiennik: suma liczników słupków == liczba ofert z ceną.
+- Dodano `tests/test_scraper.py` (17 testów, bez sieci): `parse_price`, `parse_date_text`, `extract_listing_id`, `_check_sanity` (wszystkie 5 zapór), `build_price_distribution`.
+
 ## [1.3.0] — 2026-06-01
 
 ### 🛡️ Fix: Zatrzymanie niekontrolowanego wzrostu plików danych (Excel/JSON)

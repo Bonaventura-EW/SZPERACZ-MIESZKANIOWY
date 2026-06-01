@@ -757,6 +757,30 @@ def load_existing_json():
         except (json.JSONDecodeError, IOError): pass
     return {"profiles":{}, "scan_history":[], "last_scan":None}
 
+def build_price_distribution(listings):
+    """Histogram cen aktywnych ofert (~14 słupków o „ładnym" kroku).
+    Niezmiennik: suma count w słupkach == liczba ofert z dodatnią ceną."""
+    prices = sorted([l["price"] for l in listings if l.get("price") and l["price"] > 0])
+    if not prices:
+        return []
+    mn, mx = prices[0], prices[-1]
+    if mn == mx:
+        return [{"from": mn, "to": mx + 1, "count": len(prices)}]
+    raw = (mx - mn) / 14
+    mag = 10 ** int(len(str(int(raw))) - 1)
+    step = next((f * mag for f in [1, 2, 2.5, 5, 10] if f * mag >= raw), 10 * mag)
+    start = (mn // step) * step
+    buckets = []
+    s = start
+    while s <= mx:
+        cnt = sum(1 for p in prices if p >= s and p < s + step)
+        buckets.append({"from": int(s), "to": int(s + step), "count": cnt})
+        s += step
+    # Przyciągnij puste krawędzie histogramu
+    while len(buckets) > 1 and buckets[-1]["count"] == 0: buckets.pop()
+    while len(buckets) > 1 and buckets[0]["count"] == 0:  buckets.pop(0)
+    return buckets
+
 def generate_dashboard_json(scan_results, scan_timestamp):
     data    = load_existing_json()
     now_str = scan_timestamp.strftime("%Y-%m-%d %H:%M:%S")
@@ -815,32 +839,6 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         promo_pct   = round(promo_count / total * 100, 1) if total > 0 else 0
 
         # Price distribution snapshot (all active listings with price)
-        def build_price_distribution(listings):
-            prices = sorted([l["price"] for l in listings if l.get("price") and l["price"] > 0])
-            if not prices:
-                return []
-            # Auto bucket step: aim for ~14 buckets, nice round number
-            mn, mx = prices[0], prices[-1]
-            if mn == mx:
-                return [{"from": mn, "to": mx + 1, "count": len(prices)}]
-            raw = (mx - mn) / 14
-            mag = 10 ** int(len(str(int(raw))) - 1)
-            step = next((f * mag for f in [1, 2, 2.5, 5, 10] if f * mag >= raw), 10 * mag)
-            start = (mn // step) * step
-            buckets = []
-            s = start
-            while s <= mx:
-                cnt = sum(1 for p in prices if p >= s and p < s + step)
-                buckets.append({"from": int(s), "to": int(s + step), "count": cnt})
-                s += step
-            # last price edge case
-            if prices[-1] >= s - step:
-                buckets[-1]["count"] += sum(1 for p in prices if p >= s)
-            # trim empty edges
-            while len(buckets) > 1 and buckets[-1]["count"] == 0: buckets.pop()
-            while len(buckets) > 1 and buckets[0]["count"] == 0:  buckets.pop(0)
-            return buckets
-
         price_dist = build_price_distribution(result["listings"])
 
         # Median from NEW listings only
