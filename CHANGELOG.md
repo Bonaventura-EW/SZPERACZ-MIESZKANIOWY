@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.3.0] — 2026-06-01
+
+### 🛡️ Fix: Zatrzymanie niekontrolowanego wzrostu plików danych (Excel/JSON)
+- `update_excel()` przebudowany: arkusz profilu trzyma teraz **pełną serię liczników** (1 wiersz/scan, limit `MAX_SUMMARY_ROWS = 365`) oraz **snapshot bieżących ogłoszeń przebudowywany co scan** zamiast kumulowania ~600 wierszy przy każdym uruchomieniu.
+- Arkusz `historia_cen` odbudowywany z `price_history` (JSON = źródło prawdy) — rejestruje wyłącznie realne zmiany ceny, nie powiela wszystkich ofert co scan.
+- Skutek: rozmiar Excela spadł z **4,06 MB → 95 KB**; przy symulacji 20 scanów arkusze są stabilne (~634 / 237 wierszy zamiast >12 000).
+- `generate_dashboard_json()`: dodano **trymowanie `price_history` do 90 dni** (analogicznie do `daily_counts` i `scan_history`).
+- Jednorazowa regeneracja `data/szperacz_mieszkaniowy.xlsx` — odchudzenie istniejącego pliku; `dashboard_data.json` nietknięty.
+
 ## [1.2.0] — 2026-05-29
 
 ### ✨ Feature: Nowy uproszczony endpoint API — data/api.json
