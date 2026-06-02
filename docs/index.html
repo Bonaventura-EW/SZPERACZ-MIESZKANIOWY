@@ -243,6 +243,17 @@ input[type=range].day-slider::-moz-range-thumb{
 .pm-tile{background:var(--bg-card);padding:11px 8px;text-align:center;}
 .pm-tile-v{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--accent);}
 .pm-tile-l{font-size:9px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.4px;}
+/* Sekcja rotacji rynku */
+.rotation-section{padding:24px;border-bottom:1px solid var(--border);}
+.rotation-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.rotation-title{font-family:var(--font-display);font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.7px;}
+.rotation-sub{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--accent);}
+.rotation-hist{display:flex;align-items:flex-end;gap:10px;height:150px;padding:24px 4px 0;margin-top:18px;}
+.rot-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;cursor:default;}
+.rot-bar{width:100%;background:var(--accent);border-radius:4px 4px 0 0;opacity:0.9;position:relative;transition:height 0.4s cubic-bezier(0.4,0,0.2,1),filter 0.2s;min-height:0;}
+.rot-bar-wrap:hover .rot-bar{filter:brightness(1.15);}
+.rot-bar-cnt{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--font-display);font-size:11px;font-weight:700;color:var(--text-primary);white-space:nowrap;}
+.rot-bar-lbl{font-family:var(--font-display);font-size:10px;color:var(--text-muted);margin-top:7px;text-align:center;}
 .modal p{font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6;}
 .modal input[type="text"]{width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-display);font-size:13px;margin-bottom:12px;outline:none;transition:border-color var(--transition);}
 .modal input[type="text"]:focus{border-color:var(--accent);}
@@ -308,6 +319,9 @@ input[type=range].day-slider::-moz-range-thumb{
   .listings-table td[data-hide-mobile]{display:none;}
   .line-chart-canvas-wrapper{height:180px;}
   .price-hist-bars{height:130px;}
+  .pm-tiles{grid-template-columns:repeat(2,1fr);}
+  .rotation-section{padding:14px;}
+  .rotation-hist{height:120px;gap:6px;}
 }
 </style>
 </head>
@@ -396,6 +410,16 @@ input[type=range].day-slider::-moz-range-thumb{
       <div class="price-hist-stats" id="priceHistStats"></div>
     </div>
     <div class="price-hist-tooltip" id="priceHistTooltip"></div>
+
+    <!-- Market rotation -->
+    <div class="rotation-section">
+      <div class="rotation-header">
+        <div class="rotation-title">⏳ Rotacja rynku — jak szybko oferty schodzą</div>
+        <div class="rotation-sub" id="rotationSub">—</div>
+      </div>
+      <div class="pm-tiles" id="rotationTiles"></div>
+      <div class="rotation-hist" id="rotationHist"></div>
+    </div>
 
     <!-- Line chart -->
     <div class="line-chart-section">
@@ -583,6 +607,7 @@ function renderDetail() {
   document.getElementById('detailTitle').textContent = data.label || key;
   renderStats(key);
   renderPriceHistogram(key);
+  renderRotation(key);
   renderLineChart(key);
   renderListings(currentTab);
 }
@@ -750,6 +775,49 @@ function moveHistTip(e) {
 }
 function hideHistTip() {
   document.getElementById('priceHistTooltip').style.display = 'none';
+}
+
+// ─── Market Rotation ──────────────────────────────────────
+function renderRotation(key) {
+  const data = dashData.profiles[key];
+  const archived = data.archived_listings || [];
+  const lifes = [];
+  archived.forEach(l => {
+    if (l.first_seen && l.archived_date) {
+      const days = Math.floor((new Date(l.archived_date.replace(' ','T')) - new Date(l.first_seen.replace(' ','T'))) / 86400000);
+      if (days >= 0 && days < 3650) lifes.push(days);
+    }
+  });
+  const sub   = document.getElementById('rotationSub');
+  const tiles = document.getElementById('rotationTiles');
+  const hist  = document.getElementById('rotationHist');
+  if (lifes.length < 5) {
+    sub.textContent = '—'; tiles.innerHTML = '';
+    hist.innerHTML = '<div style="width:100%;text-align:center;color:var(--text-muted);font-size:13px;padding:40px 0;font-family:var(--font-display);">Za mało danych archiwalnych do analizy rotacji</div>';
+    return;
+  }
+  lifes.sort((a,b) => a-b);
+  const n = lifes.length;
+  const median = n % 2 ? lifes[(n-1)/2] : Math.round((lifes[n/2-1] + lifes[n/2]) / 2);
+  const mean   = Math.round(lifes.reduce((a,b) => a+b, 0) / n);
+  const p7     = Math.round(100 * lifes.filter(x => x <= 7).length / n);
+  const p30    = Math.round(100 * lifes.filter(x => x >= 30).length / n);
+  sub.textContent = `${n} ofert archiwalnych`;
+  tiles.innerHTML = `
+    <div class="pm-tile"><div class="pm-tile-v">${median}</div><div class="pm-tile-l">mediana dni na rynku</div></div>
+    <div class="pm-tile"><div class="pm-tile-v" style="color:var(--green)">${p7}%</div><div class="pm-tile-l">znika ≤ 7 dni</div></div>
+    <div class="pm-tile"><div class="pm-tile-v" style="color:var(--red)">${p30}%</div><div class="pm-tile-l">wisi ≥ 30 dni</div></div>
+    <div class="pm-tile"><div class="pm-tile-v" style="color:var(--text-secondary)">${mean}</div><div class="pm-tile-l">średnia dni</div></div>`;
+  const bins = [[0,3,'<3 dni'],[3,7,'3–7 dni'],[7,14,'1–2 tyg'],[14,30,'2–4 tyg'],[30,Infinity,'>mies.']];
+  const counts = bins.map(b => lifes.filter(x => x >= b[0] && x < b[1]).length);
+  const maxC = Math.max(...counts, 1);
+  hist.innerHTML = bins.map((b,i) => {
+    const h = counts[i] > 0 ? Math.max((counts[i]/maxC)*100, 4) : 0;
+    const pctOf = Math.round(100 * counts[i] / n);
+    return `<div class="rot-bar-wrap" title="${counts[i]} ofert (${pctOf}%)">
+      <div class="rot-bar" style="height:${h}%"><span class="rot-bar-cnt">${counts[i]}</span></div>
+      <div class="rot-bar-lbl">${b[2]}</div></div>`;
+  }).join('');
 }
 
 // ─── Line Chart ────────────────────────────────────────────

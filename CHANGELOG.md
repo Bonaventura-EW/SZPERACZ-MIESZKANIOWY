@@ -4,6 +4,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
 ## [1.5.0] — 2026-06-01
 
+### ⏳ Dashboard: Sekcja „Rotacja rynku" — jak szybko oferty schodzą
+- Nowa sekcja w panelu szczegółów (pod histogramem cen, nad wykresem trendu) licząca czas życia ofert z `archived_listings` (`first_seen` → `archived_date`).
+- Kafelki: **mediana dni na rynku**, **% znika ≤7 dni**, **% wisi ≥30 dni**, średnia dni. Na bieżących danych: mediana 16 dni, 14% ≤7 dni.
+- **Histogram czasu życia** (`<3d / 3–7d / 1–2 tyg / 2–4 tyg / >mies.`) z liczbami i % w tooltipie. Próg bezpieczeństwa: <5 ofert archiwalnych → komunikat zamiast wykresu.
+- Zweryfikowano runtime w jsdom (render kafelków + histogramu, bez wyjątków).
+
 ### 📊 Dashboard: Historia ceny pojedynczej oferty (sparkline + modal)
 - Nowa kolumna **📈 Cena** w tabeli ofert — mini-sparkline (SVG) pokazujący trajektorię ceny dla każdej oferty z `price_history`; zielony punkt = spadek, czerwony = wzrost. Oferty bez zmian ceny: „—".
 - Klik w sparkline otwiera **modal z wykresem (Chart.js, linia + markery)**: etykiety delt nad punktami (własny inline-plugin, bez dodatkowych zależności), tooltipy (cena + Δ), badge sumaryczny „▼ −X zł (−Y%) od publikacji" i kafelki (start / teraz / liczba zmian / mediana zmiany).
