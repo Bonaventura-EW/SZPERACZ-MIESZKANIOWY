@@ -832,7 +832,16 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             flow_added = None; flow_removed = None
         else:
             flow_added   = len(current_ids_new - old_ids)
-            flow_removed = len(old_ids - current_ids_new)
+            # "Znikło" = ogłoszenia POTWIERDZONE jako usunięte w tym scanie, czyli te,
+            # które przechodzą do archived_listings (missing_count osiąga 2 — druga
+            # nieobecność z rzędu). NIE liczymy każdej pojedynczej nieobecności, bo
+            # OLX regularnie zwraca niekompletne wyniki (mix Otodom) i pierwsza
+            # nieobecność jest zwykle fałszywa. To samo kryterium co archiwizacja niżej:
+            # listing nieobecny teraz, który miał już missing_count >= 1, zostanie zarchiwizowany.
+            flow_removed = sum(
+                1 for l in pd_.get("current_listings", [])
+                if l["id"] not in current_ids_new and int(l.get("missing_count", 0) or 0) >= 1
+            )
 
         total  = result["count"]
         promo_count = sum(1 for l in result["listings"] if l.get("is_promoted"))
