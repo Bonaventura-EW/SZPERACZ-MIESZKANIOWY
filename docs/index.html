@@ -231,6 +231,18 @@ input[type=range].day-slider::-moz-range-thumb{
 .modal-overlay.visible{display:flex;}
 .modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:460px;width:90%;box-shadow:var(--shadow);}
 .modal h3{font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:12px;color:var(--accent);}
+.modal.modal-wide{max-width:600px;}
+/* Sparkline w tabeli + modal historii ceny */
+.spark{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+.spark svg{display:block;}
+.spark:hover svg polyline{stroke-width:2.4;}
+.spark-flat{color:var(--text-muted);font-family:var(--font-display);font-size:12px;}
+.pm-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-family:var(--font-display);font-size:13px;font-weight:700;margin-bottom:14px;}
+.pm-canvas-wrap{position:relative;height:240px;background:var(--accent-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:14px;}
+.pm-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.pm-tile{background:var(--bg-card);padding:11px 8px;text-align:center;}
+.pm-tile-v{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--accent);}
+.pm-tile-l{font-size:9px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.4px;}
 .modal p{font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6;}
 .modal input[type="text"]{width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-display);font-size:13px;margin-bottom:12px;outline:none;transition:border-color var(--transition);}
 .modal input[type="text"]:focus{border-color:var(--accent);}
@@ -425,6 +437,19 @@ input[type=range].day-slider::-moz-range-thumb{
 </main>
 
 <div class="status-toast" id="toast"></div>
+
+<div class="modal-overlay" id="priceModal" onclick="if(event.target===this)closePriceModal()">
+  <div class="modal modal-wide">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <h3 style="margin:0;">📈 Historia ceny</h3>
+      <button class="detail-close" onclick="closePriceModal()">✕</button>
+    </div>
+    <p id="pmTitle" style="margin-bottom:12px;">—</p>
+    <div id="pmBadge"></div>
+    <div class="pm-canvas-wrap"><canvas id="pmChart"></canvas></div>
+    <div class="pm-tiles" id="pmTiles"></div>
+  </div>
+</div>
 
 <div class="footer">
   SZPERACZ MIESZKANIOWY &copy; 2026 &nbsp;·&nbsp;
@@ -991,6 +1016,7 @@ function renderListings(tab) {
   html += `<table class="listings-table"><thead><tr>
     ${th('first_seen','Ogłoszenie')}
     ${th('price','Cena','Cena ogłoszenia')}
+    <th title="Trajektoria ceny — klik otwiera historię">📈 Cena</th>
     ${th('promotion_type','🏷️ Promo','Typ promocji: 🔝 Wyróżnione · ⬆️ Podbite · ✨ Podświetlone · 🔥 Pilne · 💎 Premium')}
     ${th('promoted_days','Dni prom.','Dni w bieżącej sesji promocji')}
     ${th('promoted_sessions','Sesje','Liczba sesji promocji')}
@@ -1045,10 +1071,12 @@ function renderListings(tab) {
       ? `<span style="font-family:var(--font-display);font-size:11px;color:${daysActive>30?'var(--orange)':daysActive>7?'var(--text-secondary)':'var(--green)'}">${daysActive<1?'<1':daysActive} dni</span>` : '—';
 
     const archived = l.archived_date ? l.archived_date.split(' ')[0] : '—';
+    const sparkCell = buildSparkline((data.price_history||{})[l.id]||[], l.id);
 
     html += `<tr>
       <td class="listing-title"><a href="${esc(l.url||'#')}" target="_blank">${esc(l.title||'—')}</a>${newBadge}${refreshIcon}</td>
       <td data-label="Cena"><span class="price-tag">${price}</span></td>
+      <td data-label="Trend" style="text-align:center">${sparkCell}</td>
       <td data-label="Promo" style="text-align:center">${promoStar}</td>
       <td data-label="Dni prom." data-hide-mobile style="text-align:center">${promoDays}</td>
       <td data-label="Sesje" data-hide-mobile style="text-align:center">${promoSess}</td>
@@ -1083,6 +1111,113 @@ function initTheme() {
     document.documentElement.setAttribute('data-theme', saved);
     document.getElementById('btnTheme').textContent = saved==='dark'?'🌙':'☀️';
   }
+}
+
+// ─── Price History: sparkline + modal ─────────────────────
+function buildSparkline(history, lid) {
+  if (!history || !history.length) return '<span class="spark-flat">—</span>';
+  const series = [history[0].old_price, ...history.map(h => h.new_price)];
+  const mn = Math.min(...series), mx = Math.max(...series);
+  const W = 64, H = 20, n = series.length;
+  const x = i => n <= 1 ? W/2 : (i/(n-1))*(W-4)+2;
+  const y = v => mx === mn ? H/2 : H-2 - ((v-mn)/(mx-mn))*(H-4);
+  const pts = series.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const last = series[n-1], first = series[0];
+  const dotCol = last < first ? 'var(--green)' : (last > first ? 'var(--red)' : 'var(--text-muted)');
+  return `<span class="spark" onclick="openPriceModal('${lid}')" title="${history.length} zmian ceny — klik po szczegóły">
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${x(n-1).toFixed(1)}" cy="${y(last).toFixed(1)}" r="2.3" fill="${dotCol}"/>
+    </svg></span>`;
+}
+
+let pmChart = null;
+const pmDeltaPlugin = {
+  id: 'pmDelta',
+  afterDatasetsDraw(chart) {
+    const meta = chart.getDatasetMeta(0);
+    const deltas = chart.data.datasets[0]._deltas || [];
+    const ctx = chart.ctx;
+    meta.data.forEach((pt, i) => {
+      const ch = deltas[i];
+      if (i === 0 || ch == null) return;
+      ctx.save();
+      ctx.font = "bold 11px 'JetBrains Mono', monospace";
+      ctx.fillStyle = ch < 0 ? '#10b981' : (ch > 0 ? '#ef4444' : '#8b96b0');
+      ctx.textAlign = 'center';
+      ctx.fillText((ch > 0 ? '+' : '') + ch.toLocaleString('pl-PL'), pt.x, pt.y - 10);
+      ctx.restore();
+    });
+  }
+};
+
+function openPriceModal(lid) {
+  const profiles = dashData.profiles || {};
+  const key = Object.keys(profiles)[0]; if (!key) return;
+  const data = profiles[key];
+  const hist = (data.price_history || {})[lid] || [];
+  const listing = [...(data.current_listings||[]), ...(data.archived_listings||[])].find(l => l.id === lid);
+  if (!hist.length || !listing) return;
+
+  const series = [{date:(listing.first_seen||hist[0].date).slice(0,10), price:hist[0].old_price}]
+    .concat(hist.map(h => ({date:h.date.slice(0,10), price:h.new_price})));
+  const labels = series.map(s => { const p = s.date.split('-'); return `${p[2]}.${p[1]}`; });
+  const prices = series.map(s => s.price);
+  const deltas = prices.map((v,i) => i === 0 ? null : v - prices[i-1]);
+  const total  = prices[prices.length-1] - prices[0];
+  const pct    = prices[0] ? Math.round(total/prices[0]*1000)/10 : 0;
+
+  document.getElementById('pmTitle').textContent = listing.title || lid;
+  const up = total > 0, flat = total === 0;
+  const bcol = flat ? 'var(--text-muted)' : up ? 'var(--red)' : 'var(--green)';
+  const bbg  = flat ? 'var(--accent-bg)'  : up ? 'var(--red-bg)' : 'var(--green-bg)';
+  document.getElementById('pmBadge').innerHTML =
+    `<span class="pm-badge" style="color:${bcol};background:${bbg}">${up?'▲ +':flat?'= ':'▼ '}${total.toLocaleString('pl-PL')} zł (${pct>0?'+':''}${pct}%) od publikacji</span>`;
+
+  const sortedD = deltas.filter(d => d != null).sort((a,b) => a-b);
+  const medV = sortedD.length ? sortedD[Math.floor(sortedD.length/2)] : 0;
+  document.getElementById('pmTiles').innerHTML = `
+    <div class="pm-tile"><div class="pm-tile-v" style="color:var(--text-secondary)">${prices[0].toLocaleString('pl-PL')} zł</div><div class="pm-tile-l">Start</div></div>
+    <div class="pm-tile"><div class="pm-tile-v">${prices[prices.length-1].toLocaleString('pl-PL')} zł</div><div class="pm-tile-l">Teraz</div></div>
+    <div class="pm-tile"><div class="pm-tile-v" style="color:${total<0?'var(--green)':total>0?'var(--red)':'var(--accent)'}">${hist.length}×</div><div class="pm-tile-l">Zmian</div></div>
+    <div class="pm-tile"><div class="pm-tile-v">${medV.toLocaleString('pl-PL')} zł</div><div class="pm-tile-l">Mediana zm.</div></div>`;
+
+  document.getElementById('priceModal').classList.add('visible');
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#525d78' : '#94a3b8';
+  if (pmChart) { pmChart.destroy(); pmChart = null; }
+  pmChart = new Chart(document.getElementById('pmChart'), {
+    type: 'line',
+    data: { labels, datasets: [{
+      label:'Cena', data:prices, _deltas:deltas,
+      borderColor:'#FFD700', backgroundColor:'rgba(255,215,0,0.12)',
+      borderWidth:2.5, fill:true, tension:0,
+      pointRadius:5, pointHoverRadius:7, pointBackgroundColor:isDark?'#141928':'#fff',
+      pointBorderColor:'#FFD700', pointBorderWidth:2.5,
+    }]},
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:{duration:300},
+      layout:{padding:{top:22}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx => {
+          const dch = deltas[ctx.dataIndex];
+          return `${ctx.parsed.y.toLocaleString('pl-PL')} zł` + (dch != null ? `  (${dch>0?'+':''}${dch.toLocaleString('pl-PL')} zł)` : '');
+        }}}
+      },
+      scales:{
+        x:{ticks:{color:textColor, font:{family:"'JetBrains Mono',monospace", size:10}}, grid:{color:gridColor}},
+        y:{ticks:{color:textColor, font:{family:"'JetBrains Mono',monospace", size:10}, callback:v => v.toLocaleString('pl-PL')}, grid:{color:gridColor}}
+      }
+    },
+    plugins: [pmDeltaPlugin]
+  });
+}
+function closePriceModal() {
+  document.getElementById('priceModal').classList.remove('visible');
+  if (pmChart) { pmChart.destroy(); pmChart = null; }
 }
 
 function showToast(msg, type='info') {
