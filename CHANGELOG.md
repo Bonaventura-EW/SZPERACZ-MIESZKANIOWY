@@ -2,6 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.5.0] — 2026-06-01
+
+### 📊 Dashboard: Historia ceny pojedynczej oferty (sparkline + modal)
+- Nowa kolumna **📈 Cena** w tabeli ofert — mini-sparkline (SVG) pokazujący trajektorię ceny dla każdej oferty z `price_history`; zielony punkt = spadek, czerwony = wzrost. Oferty bez zmian ceny: „—".
+- Klik w sparkline otwiera **modal z wykresem (Chart.js, linia + markery)**: etykiety delt nad punktami (własny inline-plugin, bez dodatkowych zależności), tooltipy (cena + Δ), badge sumaryczny „▼ −X zł (−Y%) od publikacji" i kafelki (start / teraz / liczba zmian / mediana zmiany).
+- Reużyto istniejącą infrastrukturę modala (zwolnioną po usunięciu modala scanu). Zweryfikowano runtime w jsdom (render tabeli, otwarcie/zamknięcie modala, plugin delt — bez wyjątków).
+
+### 🛡️ Dashboard: Self-host bibliotek + usunięcie przycisku scanu
+- Biblioteki Chart.js, hammer.js i chartjs-plugin-zoom przeniesione z zewnętrznego CDN do `docs/vendor/` — dashboard nie zależy już od cdnjs (wykresy działają nawet gdy CDN padnie). Pliki same-origin, więc SRI zbędne.
+- Usunięto przycisk „Scan teraz" wraz z modalem PAT — token GitHub (scope `repo`) nie jest już wpisywany ani przechowywany w `localStorage` przeglądarki (eliminacja ryzyka wycieku). Scan i tak działa automatycznie codziennie (`scan.yml`) + failsafe.
+
 ## [1.4.0] — 2026-06-01
 
 ### 🛡️ Refactor/Test: Testy jednostkowe + uproszczenie histogramu cen

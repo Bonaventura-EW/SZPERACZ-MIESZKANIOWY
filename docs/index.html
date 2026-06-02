@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SZPERACZ MIESZKANIOWY — Dashboard</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d0d14'/%3E%3Cpolygon points='32,10 54,30 50,30 50,54 14,54 14,30 10,30' fill='%2300e5ff' opacity='0.15'/%3E%3Cpolygon points='32,10 54,30 50,30 50,54 14,54 14,30 10,30' fill='none' stroke='%2300e5ff' stroke-width='2.5' stroke-linejoin='round'/%3E%3Crect x='24' y='38' width='10' height='16' rx='2' fill='%2300e5ff' opacity='0.4'/%3E%3Ccircle cx='43' cy='22' r='7' fill='none' stroke='%2300e5ff' stroke-width='2.5'/%3E%3Cline x1='48' y1='27' x2='54' y2='33' stroke='%2300e5ff' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js"></script>
+<!-- Biblioteki self-hostowane (docs/vendor) — brak zależności od zewnętrznych CDN -->
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/hammer.min.js"></script>
+<script src="vendor/chartjs-plugin-zoom.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -230,6 +231,18 @@ input[type=range].day-slider::-moz-range-thumb{
 .modal-overlay.visible{display:flex;}
 .modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:460px;width:90%;box-shadow:var(--shadow);}
 .modal h3{font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:12px;color:var(--accent);}
+.modal.modal-wide{max-width:600px;}
+/* Sparkline w tabeli + modal historii ceny */
+.spark{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+.spark svg{display:block;}
+.spark:hover svg polyline{stroke-width:2.4;}
+.spark-flat{color:var(--text-muted);font-family:var(--font-display);font-size:12px;}
+.pm-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-family:var(--font-display);font-size:13px;font-weight:700;margin-bottom:14px;}
+.pm-canvas-wrap{position:relative;height:240px;background:var(--accent-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:14px;}
+.pm-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.pm-tile{background:var(--bg-card);padding:11px 8px;text-align:center;}
+.pm-tile-v{font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--accent);}
+.pm-tile-l{font-size:9px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.4px;}
 .modal p{font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6;}
 .modal input[type="text"]{width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-display);font-size:13px;margin-bottom:12px;outline:none;transition:border-color var(--transition);}
 .modal input[type="text"]:focus{border-color:var(--accent);}
@@ -308,10 +321,6 @@ input[type=range].day-slider::-moz-range-thumb{
     </div>
   </div>
   <div class="topbar-right">
-    <button class="btn-scan" id="btnScan" onclick="openScanModal()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-      Scan teraz
-    </button>
     <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" title="Przełącz motyw">🌙</button>
   </div>
 </header>
@@ -427,22 +436,20 @@ input[type=range].day-slider::-moz-range-thumb{
 
 </main>
 
-<div class="modal-overlay" id="scanModal">
-  <div class="modal">
-    <div style="font-size:28px;margin-bottom:12px;">🔑</div>
-    <h3>Uruchom scan OLX</h3>
-    <p>Podaj GitHub PAT z uprawnieniem <strong>Actions: write</strong>.</p>
-    <p style="font-size:12px;"><a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" style="color:var(--accent)">Utwórz token →</a></p>
-    <input type="text" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-    <label class="modal-checkbox"><input type="checkbox" id="rememberToken"> Zapamiętaj token</label>
-    <div class="modal-buttons">
-      <button class="btn-modal btn-cancel" onclick="closeScanModal()">Anuluj</button>
-      <button class="btn-modal btn-confirm" onclick="triggerScan()">▶ Uruchom</button>
+<div class="status-toast" id="toast"></div>
+
+<div class="modal-overlay" id="priceModal" onclick="if(event.target===this)closePriceModal()">
+  <div class="modal modal-wide">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <h3 style="margin:0;">📈 Historia ceny</h3>
+      <button class="detail-close" onclick="closePriceModal()">✕</button>
     </div>
+    <p id="pmTitle" style="margin-bottom:12px;">—</p>
+    <div id="pmBadge"></div>
+    <div class="pm-canvas-wrap"><canvas id="pmChart"></canvas></div>
+    <div class="pm-tiles" id="pmTiles"></div>
   </div>
 </div>
-
-<div class="status-toast" id="toast"></div>
 
 <div class="footer">
   SZPERACZ MIESZKANIOWY &copy; 2026 &nbsp;·&nbsp;
@@ -455,7 +462,6 @@ input[type=range].day-slider::-moz-range-thumb{
 const GITHUB_OWNER = 'Bonaventura-EW';
 const GITHUB_REPO  = 'SZPERACZ-MIESZKANIOWY';
 const DATA_URL     = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/data/dashboard_data.json`;
-const WORKFLOW_FILE = 'scan.yml';
 
 let dashData      = null;
 let detailOpen    = false;
@@ -1010,6 +1016,7 @@ function renderListings(tab) {
   html += `<table class="listings-table"><thead><tr>
     ${th('first_seen','Ogłoszenie')}
     ${th('price','Cena','Cena ogłoszenia')}
+    <th title="Trajektoria ceny — klik otwiera historię">📈 Cena</th>
     ${th('promotion_type','🏷️ Promo','Typ promocji: 🔝 Wyróżnione · ⬆️ Podbite · ✨ Podświetlone · 🔥 Pilne · 💎 Premium')}
     ${th('promoted_days','Dni prom.','Dni w bieżącej sesji promocji')}
     ${th('promoted_sessions','Sesje','Liczba sesji promocji')}
@@ -1064,10 +1071,12 @@ function renderListings(tab) {
       ? `<span style="font-family:var(--font-display);font-size:11px;color:${daysActive>30?'var(--orange)':daysActive>7?'var(--text-secondary)':'var(--green)'}">${daysActive<1?'<1':daysActive} dni</span>` : '—';
 
     const archived = l.archived_date ? l.archived_date.split(' ')[0] : '—';
+    const sparkCell = buildSparkline((data.price_history||{})[l.id]||[], l.id);
 
     html += `<tr>
       <td class="listing-title"><a href="${esc(l.url||'#')}" target="_blank">${esc(l.title||'—')}</a>${newBadge}${refreshIcon}</td>
       <td data-label="Cena"><span class="price-tag">${price}</span></td>
+      <td data-label="Trend" style="text-align:center">${sparkCell}</td>
       <td data-label="Promo" style="text-align:center">${promoStar}</td>
       <td data-label="Dni prom." data-hide-mobile style="text-align:center">${promoDays}</td>
       <td data-label="Sesje" data-hide-mobile style="text-align:center">${promoSess}</td>
@@ -1104,37 +1113,111 @@ function initTheme() {
   }
 }
 
-// ─── Scan Modal ─────────────────────────────────────────────
-function openScanModal() {
-  document.getElementById('scanModal').classList.add('visible');
-  const saved = localStorage.getItem('szperacz-mieszkaniowy-token');
-  if (saved) { document.getElementById('ghToken').value=saved; document.getElementById('rememberToken').checked=true; }
+// ─── Price History: sparkline + modal ─────────────────────
+function buildSparkline(history, lid) {
+  if (!history || !history.length) return '<span class="spark-flat">—</span>';
+  const series = [history[0].old_price, ...history.map(h => h.new_price)];
+  const mn = Math.min(...series), mx = Math.max(...series);
+  const W = 64, H = 20, n = series.length;
+  const x = i => n <= 1 ? W/2 : (i/(n-1))*(W-4)+2;
+  const y = v => mx === mn ? H/2 : H-2 - ((v-mn)/(mx-mn))*(H-4);
+  const pts = series.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const last = series[n-1], first = series[0];
+  const dotCol = last < first ? 'var(--green)' : (last > first ? 'var(--red)' : 'var(--text-muted)');
+  return `<span class="spark" onclick="openPriceModal('${lid}')" title="${history.length} zmian ceny — klik po szczegóły">
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${x(n-1).toFixed(1)}" cy="${y(last).toFixed(1)}" r="2.3" fill="${dotCol}"/>
+    </svg></span>`;
 }
-function closeScanModal() { document.getElementById('scanModal').classList.remove('visible'); }
 
-async function triggerScan() {
-  const token = document.getElementById('ghToken').value.trim();
-  if (!token) { showToast('Podaj token GitHub','error'); return; }
-  if (document.getElementById('rememberToken').checked)
-    localStorage.setItem('szperacz-mieszkaniowy-token', token);
-  else localStorage.removeItem('szperacz-mieszkaniowy-token');
+let pmChart = null;
+const pmDeltaPlugin = {
+  id: 'pmDelta',
+  afterDatasetsDraw(chart) {
+    const meta = chart.getDatasetMeta(0);
+    const deltas = chart.data.datasets[0]._deltas || [];
+    const ctx = chart.ctx;
+    meta.data.forEach((pt, i) => {
+      const ch = deltas[i];
+      if (i === 0 || ch == null) return;
+      ctx.save();
+      ctx.font = "bold 11px 'JetBrains Mono', monospace";
+      ctx.fillStyle = ch < 0 ? '#10b981' : (ch > 0 ? '#ef4444' : '#8b96b0');
+      ctx.textAlign = 'center';
+      ctx.fillText((ch > 0 ? '+' : '') + ch.toLocaleString('pl-PL'), pt.x, pt.y - 10);
+      ctx.restore();
+    });
+  }
+};
 
-  const btn = document.getElementById('btnScan');
-  btn.classList.add('scanning'); btn.textContent='⏳ Skanowanie...';
-  closeScanModal();
-  try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
-      {method:'POST', headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
-       body:JSON.stringify({ref:'main'})});
-    if (resp.status===204) {
-      showToast('✅ Scan uruchomiony! Dane zaktualizują się za ~3 min.','success');
-      setTimeout(()=>{loadData();showToast('📊 Dane odświeżone','info');}, 200000);
-    } else if (resp.status===401||resp.status===403) showToast('❌ Błąd autoryzacji — sprawdź token','error');
-    else showToast(`Błąd: HTTP ${resp.status}`,'error');
-  } catch(e) { showToast(`Błąd: ${e.message}`,'error'); }
-  btn.classList.remove('scanning');
-  btn.innerHTML = _btnScanOriginal;
+function openPriceModal(lid) {
+  const profiles = dashData.profiles || {};
+  const key = Object.keys(profiles)[0]; if (!key) return;
+  const data = profiles[key];
+  const hist = (data.price_history || {})[lid] || [];
+  const listing = [...(data.current_listings||[]), ...(data.archived_listings||[])].find(l => l.id === lid);
+  if (!hist.length || !listing) return;
+
+  const series = [{date:(listing.first_seen||hist[0].date).slice(0,10), price:hist[0].old_price}]
+    .concat(hist.map(h => ({date:h.date.slice(0,10), price:h.new_price})));
+  const labels = series.map(s => { const p = s.date.split('-'); return `${p[2]}.${p[1]}`; });
+  const prices = series.map(s => s.price);
+  const deltas = prices.map((v,i) => i === 0 ? null : v - prices[i-1]);
+  const total  = prices[prices.length-1] - prices[0];
+  const pct    = prices[0] ? Math.round(total/prices[0]*1000)/10 : 0;
+
+  document.getElementById('pmTitle').textContent = listing.title || lid;
+  const up = total > 0, flat = total === 0;
+  const bcol = flat ? 'var(--text-muted)' : up ? 'var(--red)' : 'var(--green)';
+  const bbg  = flat ? 'var(--accent-bg)'  : up ? 'var(--red-bg)' : 'var(--green-bg)';
+  document.getElementById('pmBadge').innerHTML =
+    `<span class="pm-badge" style="color:${bcol};background:${bbg}">${up?'▲ +':flat?'= ':'▼ '}${total.toLocaleString('pl-PL')} zł (${pct>0?'+':''}${pct}%) od publikacji</span>`;
+
+  const sortedD = deltas.filter(d => d != null).sort((a,b) => a-b);
+  const medV = sortedD.length ? sortedD[Math.floor(sortedD.length/2)] : 0;
+  document.getElementById('pmTiles').innerHTML = `
+    <div class="pm-tile"><div class="pm-tile-v" style="color:var(--text-secondary)">${prices[0].toLocaleString('pl-PL')} zł</div><div class="pm-tile-l">Start</div></div>
+    <div class="pm-tile"><div class="pm-tile-v">${prices[prices.length-1].toLocaleString('pl-PL')} zł</div><div class="pm-tile-l">Teraz</div></div>
+    <div class="pm-tile"><div class="pm-tile-v" style="color:${total<0?'var(--green)':total>0?'var(--red)':'var(--accent)'}">${hist.length}×</div><div class="pm-tile-l">Zmian</div></div>
+    <div class="pm-tile"><div class="pm-tile-v">${medV.toLocaleString('pl-PL')} zł</div><div class="pm-tile-l">Mediana zm.</div></div>`;
+
+  document.getElementById('priceModal').classList.add('visible');
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#525d78' : '#94a3b8';
+  if (pmChart) { pmChart.destroy(); pmChart = null; }
+  pmChart = new Chart(document.getElementById('pmChart'), {
+    type: 'line',
+    data: { labels, datasets: [{
+      label:'Cena', data:prices, _deltas:deltas,
+      borderColor:'#FFD700', backgroundColor:'rgba(255,215,0,0.12)',
+      borderWidth:2.5, fill:true, tension:0,
+      pointRadius:5, pointHoverRadius:7, pointBackgroundColor:isDark?'#141928':'#fff',
+      pointBorderColor:'#FFD700', pointBorderWidth:2.5,
+    }]},
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:{duration:300},
+      layout:{padding:{top:22}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx => {
+          const dch = deltas[ctx.dataIndex];
+          return `${ctx.parsed.y.toLocaleString('pl-PL')} zł` + (dch != null ? `  (${dch>0?'+':''}${dch.toLocaleString('pl-PL')} zł)` : '');
+        }}}
+      },
+      scales:{
+        x:{ticks:{color:textColor, font:{family:"'JetBrains Mono',monospace", size:10}}, grid:{color:gridColor}},
+        y:{ticks:{color:textColor, font:{family:"'JetBrains Mono',monospace", size:10}, callback:v => v.toLocaleString('pl-PL')}, grid:{color:gridColor}}
+      }
+    },
+    plugins: [pmDeltaPlugin]
+  });
+}
+function closePriceModal() {
+  document.getElementById('priceModal').classList.remove('visible');
+  if (pmChart) { pmChart.destroy(); pmChart = null; }
 }
 
 function showToast(msg, type='info') {
@@ -1144,7 +1227,6 @@ function showToast(msg, type='info') {
 }
 function esc(str) { const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
 
-const _btnScanOriginal = document.getElementById('btnScan').innerHTML;
 initTheme();
 loadData();
 setInterval(loadData, 300000);
