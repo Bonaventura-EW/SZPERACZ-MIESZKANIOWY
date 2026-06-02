@@ -2,6 +2,13 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.5.1] — 2026-06-02
+
+### 🐛 Fix: „Znikło" (API + dashboard) liczone z potwierdzonych usunięć
+- `flow_removed` w `generate_dashboard_json()` liczył wcześniej KAŻDĄ pojedynczą nieobecność oferty w danym scanie (`old_ids - current_ids_new`), co przy niekompletnych wynikach OLX (mix Otodom) zawyżało wartość do kilkudziesięciu (np. 58, 75) mimo że realnie znikało 1–9 ofert.
+- Teraz `flow_removed` liczy wyłącznie oferty **potwierdzone jako usunięte** — te, które przechodzą do `archived_listings` w tym scanie (drugą nieobecność z rzędu, `missing_count >= 2`). To samo kryterium co mechanizm archiwizacji 2-scan.
+- Wpływa na: `listings_removed` w `scan_status.json` / `scan_history.json` (kolumna „Znikło" w API) oraz pole `removed` w `daily_counts` (wykres „Przybyło/Zniknęło" i kafelek „Zniknęło" na dashboardzie). `added` bez zmian (nowa oferta jest realnie nowa od razu).
+
 ## [1.5.0] — 2026-06-01
 
 ### 📊 Dashboard: Historia ceny pojedynczej oferty (sparkline + modal)
