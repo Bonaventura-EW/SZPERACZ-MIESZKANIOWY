@@ -41889,7 +41889,21 @@
           ]
         }
       }
+    },
+    {
+      "timestamp": "2026-06-03 14:55:25",
+      "date": "2026-06-03",
+      "profiles": {
+        "mieszkania_lublin": {
+          "count": 0,
+          "crosscheck": "anomaly_detected",
+          "anomaly_reasons": [
+            "count=0 (puste wyniki)",
+            "duration=0.3s < 30s (zbyt szybko)"
+          ]
+        }
+      }
     }
   ],
-  "last_scan": "2026-06-03 11:59:38"
+  "last_scan": "2026-06-03 14:55:25"
 }
