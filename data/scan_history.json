@@ -1,5 +1,5 @@
 {
-  "total_scans": 40,
+  "total_scans": 42,
   "scans": [
     {
       "timestamp": "2026-05-01T09:05:26Z",
@@ -738,6 +738,39 @@
           "listings_new": null,
           "listings_removed": null,
           "crosscheck": "anomaly_detected"
+        }
+      ],
+      "error": null
+    },
+    {
+      "timestamp": "2026-06-03T15:02:03Z",
+      "timestamp_local": "2026-06-03 15:02:03",
+      "status": "error",
+      "duration_seconds": 0,
+      "listings_total": null,
+      "listings_new": null,
+      "listings_removed": null,
+      "scan_number": 41,
+      "profiles": [],
+      "error": "ModuleNotFoundError: No module named 'bs4'"
+    },
+    {
+      "timestamp": "2026-06-03T15:02:15Z",
+      "timestamp_local": "2026-06-03 15:02:15",
+      "status": "success",
+      "duration_seconds": 95,
+      "listings_total": 591,
+      "listings_new": 25,
+      "listings_removed": 7,
+      "scan_number": 42,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "Mieszkania na wynajem — Lublin",
+          "listings_total": 591,
+          "listings_new": 25,
+          "listings_removed": 7,
+          "crosscheck": "passed"
         }
       ],
       "error": null
