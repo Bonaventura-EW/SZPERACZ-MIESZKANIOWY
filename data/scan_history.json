@@ -1,5 +1,5 @@
 {
-  "total_scans": 40,
+  "total_scans": 42,
   "scans": [
     {
       "timestamp": "2026-05-01T09:05:26Z",
@@ -735,6 +735,39 @@
           "key": "mieszkania_lublin",
           "label": "mieszkania_lublin",
           "listings_total": 286,
+          "listings_new": null,
+          "listings_removed": null,
+          "crosscheck": "anomaly_detected"
+        }
+      ],
+      "error": null
+    },
+    {
+      "timestamp": "2026-06-03T12:40:31Z",
+      "timestamp_local": "2026-06-03 12:40:31",
+      "status": "error",
+      "duration_seconds": 0,
+      "listings_total": null,
+      "listings_new": null,
+      "listings_removed": null,
+      "scan_number": 41,
+      "profiles": [],
+      "error": "ModuleNotFoundError: No module named 'bs4'"
+    },
+    {
+      "timestamp": "2026-06-03T12:40:38Z",
+      "timestamp_local": "2026-06-03 12:40:38",
+      "status": "anomaly_detected",
+      "duration_seconds": 94,
+      "listings_total": 0,
+      "listings_new": null,
+      "listings_removed": null,
+      "scan_number": 42,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "mieszkania_lublin",
+          "listings_total": 0,
           "listings_new": null,
           "listings_removed": null,
           "crosscheck": "anomaly_detected"
