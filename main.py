@@ -89,14 +89,21 @@ def build_profiles_summary(results):
     profiles = []
     for pk, r in results.items():
         flow = r.get("flow", {})
-        profiles.append({
+        entry = {
             "key":              pk,
             "label":            flow.get("label", pk),
             "listings_total":   flow.get("listings_total", r.get("count")),
             "listings_new":     flow.get("listings_new"),
             "listings_removed": flow.get("listings_removed"),
             "crosscheck":       flow.get("crosscheck", r.get("crosscheck")),
-        })
+        }
+        # Przy anomalii flow jest pusty (profil pominięty w generate_dashboard_json) —
+        # powody odrzucenia siedzą bezpośrednio w wyniku scrapera.
+        if r.get("anomaly_reasons"):
+            entry["anomaly_reasons"] = r["anomaly_reasons"]
+        if r.get("previous_good_count") is not None:
+            entry["previous_good_count"] = r["previous_good_count"]
+        profiles.append(entry)
     return profiles
 
 
@@ -151,6 +158,24 @@ if __name__ == "__main__":
         elif anomaly_profiles:
             scan_status = "partial_anomaly"
 
+        # Komunikat dla API gdy zadziałał mechanizm anomalii (sanity check) —
+        # bez tego pola error/error_detail zostawały None i nie było widać, czemu scan padł.
+        anomaly_error = None
+        anomaly_detail = None
+        if anomaly_profiles:
+            parts = []
+            for p in anomaly_profiles:
+                reasons = p.get("anomaly_reasons") or []
+                rtxt = " | ".join(reasons) if reasons else "sanity check nie przeszedł"
+                parts.append(f"[{p['key']}] {rtxt}")
+            anomaly_detail = "; ".join(parts)
+            if scan_status == "anomaly_detected":
+                anomaly_error = ("Scan odrzucony przez mechanizm anomalii (sanity check) — "
+                                 "dane NIE zostały zaktualizowane")
+            else:
+                anomaly_error = ("Część profili odrzucona przez mechanizm anomalii (sanity check) — "
+                                 "dane tych profili NIE zostały zaktualizowane")
+
         status.update({
             "status":           scan_status,
             "duration_seconds": duration,
@@ -158,8 +183,8 @@ if __name__ == "__main__":
             "listings_new":     listings_new     if has_flow else None,
             "listings_removed": listings_removed if has_flow else None,
             "profiles":         profiles,
-            "error":            None,
-            "error_detail":     None,
+            "error":            anomaly_error,
+            "error_detail":     anomaly_detail,
         })
 
     except Exception as e:
@@ -211,6 +236,11 @@ if __name__ == "__main__":
                   f"new={p['listings_new']} "
                   f"removed={p['listings_removed']} "
                   f"crosscheck={p['crosscheck']}")
+    elif status["status"] in ("anomaly_detected", "partial_anomaly"):
+        print(f"⚠️  Scan #{scan_number} ANOMALY — {status['error']}")
+        if status.get("error_detail"):
+            print(f"   powód: {status['error_detail']}")
+        sys.exit(1)
     else:
         print(f"❌ Scan #{scan_number} FAILED — {status['error']}")
         sys.exit(1)

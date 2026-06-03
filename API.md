@@ -60,6 +60,40 @@ Aktualizowany automatycznie po każdym scanie (codziennie ~9:00 CET, lub ręczni
 }
 ```
 
+#### Odpowiedź — anomalia (zadziałał mechanizm sanity check)
+
+Gdy scraper wykryje anomalię (np. spadek liczby ogłoszeń >40% vs ostatni udany scan,
+zbyt mała liczba wyników, podejrzenie CAPTCHA) — **dane NIE są aktualizowane**, a status
+przyjmuje wartość `"anomaly_detected"` (wszystkie profile) lub `"partial_anomaly"` (część profili).
+
+```json
+{
+  "status": "anomaly_detected",
+  "timestamp": "2026-06-03T11:59:27Z",
+  "timestamp_local": "2026-06-03 13:59:27",
+  "duration_seconds": 219,
+  "listings_total": 286,
+  "listings_new": null,
+  "listings_removed": null,
+  "scan_number": 40,
+  "profiles": [
+    {
+      "key": "mieszkania_lublin",
+      "label": "Mieszkania na wynajem — Lublin",
+      "listings_total": 286,
+      "crosscheck": "anomaly_detected",
+      "anomaly_reasons": ["spadek 52.6% vs poprzedni count=604"],
+      "previous_good_count": 604
+    }
+  ],
+  "error": "Scan odrzucony przez mechanizm anomalii (sanity check) — dane NIE zostały zaktualizowane",
+  "error_detail": "[mieszkania_lublin] spadek 52.6% vs poprzedni count=604"
+}
+```
+
+> Przy `anomaly_detected` / `partial_anomaly` poprzednie poprawne dane (`dashboard_data.json`)
+> pozostają nienaruszone. Konsument API powinien traktować taki scan jako nieudany i nie podmieniać liczb.
+
 #### Odpowiedź — oczekiwanie (przed pierwszym scanem)
 
 ```json
@@ -162,7 +196,7 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 
 | Pole | Typ | Opis |
 |------|-----|------|
-| `status` | string | `"success"` / `"error"` / `"pending"` |
+| `status` | string | `"success"` / `"error"` / `"anomaly_detected"` / `"partial_anomaly"` / `"pending"` |
 | `timestamp` | string / null | Czas UTC w formacie ISO 8601 |
 | `timestamp_local` | string / null | Czas lokalny (CET/CEST) |
 | `duration_seconds` | int / null | Czas trwania scanu w sekundach |
@@ -171,8 +205,8 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | `listings_new` | int / null | Łączna liczba nowych ogłoszeń |
 | `listings_removed` | int / null | Łączna liczba usuniętych ogłoszeń |
 | `profiles` | array | Szczegóły per profil (patrz niżej) |
-| `error` | string / null | Krótki opis błędu (max 200 znaków) |
-| `error_detail` | string / null | Ostatnie 800 znaków traceback (tylko w `scan_status.json`) |
+| `error` | string / null | Krótki opis błędu (max 200 znaków). Przy anomalii: komunikat o odrzuceniu scanu przez sanity check |
+| `error_detail` | string / null | Ostatnie 800 znaków traceback (tylko w `scan_status.json`). Przy anomalii: powody odrzucenia per profil |
 
 ### Pola obiektu `profiles[]`
 
@@ -183,7 +217,9 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | `listings_total` | int / null | Liczba ogłoszeń w tym profilu |
 | `listings_new` | int / null | Nowe ogłoszenia w tym profilu (null przy pierwszym scanie) |
 | `listings_removed` | int / null | Usunięte ogłoszenia w tym profilu (null przy pierwszym scanie) |
-| `crosscheck` | string / null | Wynik weryfikacji: `"passed"`, `"passed_retry"`, `"consistent"`, `"best_of_two"`, `"error"` |
+| `crosscheck` | string / null | Wynik weryfikacji: `"passed"`, `"passed_retry"`, `"consistent"`, `"best_of_two"`, `"anomaly_detected"`, `"error"` |
+| `anomaly_reasons` | array | (tylko przy anomalii) Lista powodów odrzucenia scanu przez sanity check |
+| `previous_good_count` | int / null | (tylko przy anomalii) Liczba ogłoszeń z ostatniego udanego scanu — punkt odniesienia |
 
 > `listings_new` i `listings_removed` są liczone na podstawie porównania **ID ogłoszeń** (nie różnicy liczb),
 > więc są dokładne nawet gdy OLX zmienia kolejność wyników.

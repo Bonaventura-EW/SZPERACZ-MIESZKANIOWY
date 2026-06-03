@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.5.2] — 2026-06-03
+
+### 🛡️ API: Czytelny komunikat gdy scan odrzucony przez mechanizm anomalii
+- Gdy sanity check odrzucał scan (`status: anomaly_detected` / `partial_anomaly`), pola `error` i `error_detail` w `scan_status.json` / `scan_history.json` zostawały `null` — w logach GitHub Actions widać było mylące `❌ Scan #N FAILED — None`, a konsument API nie wiedział, czemu scan padł.
+- `main.py` ustawia teraz przy anomalii czytelny `error` („Scan odrzucony przez mechanizm anomalii (sanity check) — dane NIE zostały zaktualizowane") oraz `error_detail` z powodami per profil (np. „[mieszkania_lublin] spadek 52.6% vs poprzedni count=604").
+- `build_profiles_summary()` propaguje do obiektu profilu pola `anomaly_reasons` (lista powodów) i `previous_good_count` (punkt odniesienia z ostatniego udanego scanu).
+- Log końcowy rozróżnia anomalię (`⚠️ Scan #N ANOMALY — …`) od twardego błędu (`❌ … FAILED`).
+- `API.md`: udokumentowano statusy `anomaly_detected` / `partial_anomaly`, nowe pola profilu oraz przykład odpowiedzi.
+
 ## [1.5.1] — 2026-06-02
 
 ### 🐛 Fix: „Znikło" (API + dashboard) liczone z potwierdzonych usunięć
