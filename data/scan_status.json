@@ -1,27 +1,22 @@
 {
-  "status": "anomaly_detected",
-  "timestamp": "2026-06-05T10:52:19Z",
-  "timestamp_local": "2026-06-05 10:52:19",
-  "duration_seconds": 94,
-  "listings_total": 0,
-  "listings_new": null,
-  "listings_removed": null,
-  "scan_number": 43,
+  "status": "success",
+  "timestamp": "2026-06-05T14:20:31Z",
+  "timestamp_local": "2026-06-05 14:20:31",
+  "duration_seconds": 84,
+  "listings_total": 585,
+  "listings_new": 26,
+  "listings_removed": 12,
+  "scan_number": 44,
   "profiles": [
     {
       "key": "mieszkania_lublin",
-      "label": "mieszkania_lublin",
-      "listings_total": 0,
-      "listings_new": null,
-      "listings_removed": null,
-      "crosscheck": "anomaly_detected",
-      "anomaly_reasons": [
-        "count=0 (puste wyniki)",
-        "duration=0.2s < 30s (zbyt szybko)"
-      ],
-      "previous_good_count": 592
+      "label": "Mieszkania na wynajem — Lublin",
+      "listings_total": 585,
+      "listings_new": 26,
+      "listings_removed": 12,
+      "crosscheck": "passed"
     }
   ],
-  "error": "Scan odrzucony przez mechanizm anomalii (sanity check) — dane NIE zostały zaktualizowane",
-  "error_detail": "[mieszkania_lublin] count=0 (puste wyniki) | duration=0.2s < 30s (zbyt szybko)"
+  "error": null,
+  "error_detail": null
 }
