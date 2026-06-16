@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.5.3] — 2026-06-16
+
+### 🛡️ Guard: Wykrywanie niepełnego scanu (masowy „missing") + ekspozycja w API
+- Scan #55 (15.06) zwrócił 429 zamiast ~585 ofert — niepełny scrape OLX, w którym **217 ofert (36.6% bazy) zniknęło w jednym scanie**. Spadek total wyniósł tylko 27%, więc **nie** przekroczył progu anomalii (`SANITY_MAX_DROP_RATIO = 0.40`) i scan przeszedł jako `success`. Realne ryzyko: przy drugim niepełnym scanie z rzędu mechanizm 2-scan zarchiwizowałby ~200 ofert naraz.
+- Nowy próg `SANITY_MAX_MISSING_RATIO = 0.25` w `scraper.py`: gdy liczba ofert świeżo nieobecnych (`carried_missing`, `missing_count` 0→1) przekracza 25% bazy sprzed scanu, `generate_dashboard_json()` dokleja obiekt `partial_scan_warning` (`missing_this_scan`, `base_count`, `scanned_count`, `missing_ratio`, `message`) do `scan_entry` i flow stats. Dane są nadal zapisywane (znalezione oferty są realne) — to ostrzeżenie, nie odrzucenie.
+- `main.py`: nowy status `partial_scan` + pole `warning` (poziom główny) i `partial_scan_warning` (per profil) w `scan_status.json` / `scan_history.json`; opcjonalne pole `warning` w `api.json`. Status `partial_scan` kończy się exit 0 (sukces z ostrzeżeniem), log: `⚠️ … OSTRZEŻENIE (niepełny scan)`.
+- Ręczny scan #56 odbudował bazę do 627 ofert — 217 brakujących wróciło (`missing_count` zresetowany), potwierdzając diagnozę niepełnego scrape.
+- `API.md`: udokumentowano status `partial_scan`, pola `warning` / `partial_scan_warning` oraz przykład odpowiedzi.
+
 ## [1.5.2] — 2026-06-03
 
 ### 🛡️ API: Czytelny komunikat gdy scan odrzucony przez mechanizm anomalii

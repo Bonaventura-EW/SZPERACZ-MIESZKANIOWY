@@ -414,6 +414,7 @@ SANITY_MIN_COUNT       = 50      # poniżej traktujemy jako uszkodzenie (kategor
 SANITY_MIN_HEADER      = 10      # header_count < 10 to znak, że strona się nie załadowała
 SANITY_MIN_DURATION_S  = 30      # scan poniżej 30s = CAPTCHA-page lub redirect (nie pełna paginacja)
 SANITY_MAX_DROP_RATIO  = 0.40    # spadek > 40% vs ostatni udany scan = czerwona flaga
+SANITY_MAX_MISSING_RATIO = 0.25  # >25% bazy znika w jednym scanie (carried_missing) = niepełny scrape
 COOLDOWN_AFTER_ANOMALY = 90      # sekundy pauzy przed retry po wykryciu anomalii
 
 def _previous_good_count(profile_key):
@@ -1068,6 +1069,29 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         # current_listings = realnie znalezione + carry-over (missing 1×)
         pd_["current_listings"] = new_listings + carried_missing
 
+        # ── Zapora: masowy "missing" w jednym scanie ──────────────────────
+        # Gdy duża część bazy znika w pojedynczym scanie (carried_missing), to
+        # niemal zawsze niepełny scrape OLX, a nie realny odpływ ofert. Spadek
+        # total bywa poniżej progu SANITY_MAX_DROP_RATIO (bo "missing" != "removed",
+        # archiwizacja jest 2-scan), więc zwykła zapora go NIE łapie. Sygnalizujemy
+        # to przez API — operator dostaje ostrzeżenie już po pierwszym niepełnym
+        # scanie, zanim te oferty zostaną (przy drugim z rzędu) masowo zarchiwizowane.
+        base_for_missing = current_listings_count   # liczba ofert sprzed tego scanu
+        freshly_missing  = len(carried_missing)
+        missing_ratio    = (freshly_missing / base_for_missing) if base_for_missing else 0.0
+        partial_scan_warning = None
+        if base_for_missing and missing_ratio > SANITY_MAX_MISSING_RATIO:
+            partial_scan_warning = {
+                "missing_this_scan": freshly_missing,
+                "base_count":        base_for_missing,
+                "scanned_count":     result["count"],
+                "missing_ratio":     round(missing_ratio, 3),
+                "message": (f"{freshly_missing} z {base_for_missing} ofert "
+                            f"({missing_ratio*100:.1f}%) zniknęło w jednym scanie — "
+                            f"prawdopodobnie niepełny scrape OLX, nie realny odpływ"),
+            }
+            log.warning(f"[PARTIAL-SCAN] {pk}: {partial_scan_warning['message']}")
+
         # Trymowanie price_history do ostatnich 90 dni — ogranicza wzrost JSON.
         # Porównanie stringów "%Y-%m-%d %H:%M:%S" jest chronologiczne leksykograficznie.
         cutoff = (scan_timestamp - timedelta(days=90)).strftime("%Y-%m-%d %H:%M:%S")
@@ -1080,6 +1104,8 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 del ph_map[ph_lid]
 
         scan_entry["profiles"][pk] = {"count": result["count"], "crosscheck": crosscheck}
+        if partial_scan_warning:
+            scan_entry["profiles"][pk]["partial_scan_warning"] = partial_scan_warning
 
         # Zapisz flow stats per profil
         profile_flow_stats[pk] = {
@@ -1088,6 +1114,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             "listings_new":     flow_added,
             "listings_removed": flow_removed,
             "crosscheck":       crosscheck,
+            "partial_scan_warning": partial_scan_warning,
         }
 
     data["scan_history"].append(scan_entry)

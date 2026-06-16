@@ -1,30 +1,6 @@
 {
-  "total_scans": 55,
+  "total_scans": 57,
   "scans": [
-    {
-      "timestamp": "2026-05-05T09:12:13Z",
-      "timestamp_local": "2026-05-05 09:12:13",
-      "status": "success",
-      "duration_seconds": 96,
-      "listings_total": 601,
-      "listings_new": 13,
-      "listings_removed": 0,
-      "scan_number": 6,
-      "crosscheck": "passed",
-      "error": null
-    },
-    {
-      "timestamp": "2026-05-06T09:30:41Z",
-      "timestamp_local": "2026-05-06 09:30:41",
-      "status": "success",
-      "duration_seconds": 97,
-      "listings_total": 628,
-      "listings_new": 27,
-      "listings_removed": 0,
-      "scan_number": 7,
-      "crosscheck": "passed",
-      "error": null
-    },
     {
       "timestamp": "2026-05-07T09:40:34Z",
       "timestamp_local": "2026-05-07 09:40:34",
@@ -1006,6 +982,49 @@
         }
       ],
       "error": null
+    },
+    {
+      "timestamp": "2026-06-16T07:48:46Z",
+      "timestamp_local": "2026-06-16 07:48:46",
+      "status": "success",
+      "duration_seconds": 91,
+      "listings_total": 627,
+      "listings_new": 27,
+      "listings_removed": 36,
+      "scan_number": 56,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "Mieszkania na wynajem — Lublin",
+          "listings_total": 627,
+          "listings_new": 27,
+          "listings_removed": 36,
+          "crosscheck": "passed"
+        }
+      ],
+      "error": null
+    },
+    {
+      "timestamp": "2026-06-16T07:54:43Z",
+      "timestamp_local": "2026-06-16 07:54:43",
+      "status": "success",
+      "duration_seconds": 100,
+      "listings_total": 621,
+      "listings_new": 0,
+      "listings_removed": 10,
+      "scan_number": 57,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "Mieszkania na wynajem — Lublin",
+          "listings_total": 621,
+          "listings_new": 0,
+          "listings_removed": 10,
+          "crosscheck": "passed"
+        }
+      ],
+      "error": null,
+      "warning": null
     }
   ]
 }

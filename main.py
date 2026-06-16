@@ -74,6 +74,9 @@ def save_api(status_data, history_data):
         "total_listings": total_now,
         "scans":          last_three,
     }
+    # Niepełny scan (masowy "missing") — wystawiamy ostrzeżenie w publicznym API.
+    if status_data.get("warning"):
+        api_data["warning"] = status_data["warning"]
 
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(API_PATH, "w", encoding="utf-8") as f:
@@ -103,6 +106,9 @@ def build_profiles_summary(results):
             entry["anomaly_reasons"] = r["anomaly_reasons"]
         if r.get("previous_good_count") is not None:
             entry["previous_good_count"] = r["previous_good_count"]
+        # Ostrzeżenie o niepełnym scanie (masowy "missing") — surfaced przez API.
+        if flow.get("partial_scan_warning"):
+            entry["partial_scan_warning"] = flow["partial_scan_warning"]
         profiles.append(entry)
     return profiles
 
@@ -133,6 +139,7 @@ if __name__ == "__main__":
         "profiles":         [],
         "error":            None,
         "error_detail":     None,
+        "warning":          None,
     }
 
     try:
@@ -157,6 +164,19 @@ if __name__ == "__main__":
             scan_status = "anomaly_detected"
         elif anomaly_profiles:
             scan_status = "partial_anomaly"
+
+        # Ostrzeżenie o niepełnym scanie (masowy "missing" w jednym scanie).
+        # Dane SĄ zapisane (znalezione oferty są realne), ale sygnalizujemy ryzyko
+        # — przy drugim niepełnym scanie z rzędu grozi masowa archiwizacja.
+        partial_scan_profiles = [p for p in profiles if p.get("partial_scan_warning")]
+        scan_warning = None
+        if partial_scan_profiles:
+            scan_warning = "; ".join(
+                f"[{p['key']}] {p['partial_scan_warning']['message']}"
+                for p in partial_scan_profiles
+            )
+            if scan_status == "success":
+                scan_status = "partial_scan"
 
         # Komunikat dla API gdy zadziałał mechanizm anomalii (sanity check) —
         # bez tego pola error/error_detail zostawały None i nie było widać, czemu scan padł.
@@ -185,6 +205,7 @@ if __name__ == "__main__":
             "profiles":         profiles,
             "error":            anomaly_error,
             "error_detail":     anomaly_detail,
+            "warning":          scan_warning,
         })
 
     except Exception as e:
@@ -215,6 +236,7 @@ if __name__ == "__main__":
         "scan_number":      status["scan_number"],
         "profiles":         status.get("profiles", []),
         "error":            status.get("error"),
+        "warning":          status.get("warning"),
     }
     history["scans"].append(history_entry)
     history["total_scans"] = scan_number
@@ -226,8 +248,9 @@ if __name__ == "__main__":
     save_api(status, history)
 
     # Wynik w logach GitHub Actions
-    if status["status"] == "success":
-        print(f"✅ Scan #{scan_number} OK — {status['listings_total']} ogłoszeń"
+    if status["status"] in ("success", "partial_scan"):
+        icon = "✅" if status["status"] == "success" else "⚠️ "
+        print(f"{icon} Scan #{scan_number} OK — {status['listings_total']} ogłoszeń"
               f" | nowe: {status['listings_new']} | usunięte: {status['listings_removed']}"
               f" | czas: {status['duration_seconds']}s")
         for p in status.get("profiles", []):
@@ -236,6 +259,8 @@ if __name__ == "__main__":
                   f"new={p['listings_new']} "
                   f"removed={p['listings_removed']} "
                   f"crosscheck={p['crosscheck']}")
+        if status.get("warning"):
+            print(f"⚠️  OSTRZEŻENIE (niepełny scan): {status['warning']}")
     elif status["status"] in ("anomaly_detected", "partial_anomaly"):
         print(f"⚠️  Scan #{scan_number} ANOMALY — {status['error']}")
         if status.get("error_detail"):

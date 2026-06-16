@@ -94,6 +94,48 @@ przyjmuje wartość `"anomaly_detected"` (wszystkie profile) lub `"partial_anoma
 > Przy `anomaly_detected` / `partial_anomaly` poprzednie poprawne dane (`dashboard_data.json`)
 > pozostają nienaruszone. Konsument API powinien traktować taki scan jako nieudany i nie podmieniać liczb.
 
+#### Odpowiedź — niepełny scan (ostrzeżenie)
+
+Gdy w **jednym scanie** zniknie nadmiernie duża część bazy (>25% — pole `missing_ratio`), to
+prawie zawsze niepełny scrape OLX, a nie realny odpływ ofert. Taki ubytek bywa **poniżej** progu
+anomalii (40% spadku total), bo „missing" ≠ „removed" (archiwizacja wymaga 2 nieobecności z rzędu).
+Status przyjmuje wówczas wartość `"partial_scan"`, a w polu `warning` (oraz per-profil
+`partial_scan_warning`) pojawia się opis. **Dane SĄ zapisane** (znalezione oferty są realne) —
+to ostrzeżenie, nie odrzucenie: sygnalizuje ryzyko masowej archiwizacji przy drugim niepełnym scanie z rzędu.
+
+```json
+{
+  "status": "partial_scan",
+  "timestamp": "2026-06-15T13:21:23Z",
+  "timestamp_local": "2026-06-15 13:21:23",
+  "duration_seconds": 71,
+  "listings_total": 429,
+  "listings_new": 54,
+  "listings_removed": 17,
+  "scan_number": 55,
+  "profiles": [
+    {
+      "key": "mieszkania_lublin",
+      "label": "Mieszkania na wynajem — Lublin",
+      "listings_total": 429,
+      "listings_new": 54,
+      "listings_removed": 17,
+      "crosscheck": "passed",
+      "partial_scan_warning": {
+        "missing_this_scan": 217,
+        "base_count": 593,
+        "scanned_count": 429,
+        "missing_ratio": 0.366,
+        "message": "217 z 593 ofert (36.6%) zniknęło w jednym scanie — prawdopodobnie niepełny scrape OLX, nie realny odpływ"
+      }
+    }
+  ],
+  "error": null,
+  "error_detail": null,
+  "warning": "[mieszkania_lublin] 217 z 593 ofert (36.6%) zniknęło w jednym scanie — prawdopodobnie niepełny scrape OLX, nie realny odpływ"
+}
+```
+
 #### Odpowiedź — oczekiwanie (przed pierwszym scanem)
 
 ```json
@@ -185,6 +227,7 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | `scans[].total_listings` | int / null | Liczba ogłoszeń w momencie tego scanu. |
 | `scans[].added` | int / null | Nowe ogłoszenia vs poprzedni scan (`null` przy pierwszym scanie w historii). |
 | `scans[].removed` | int / null | Ogłoszenia, które zniknęły vs poprzedni scan (`null` przy pierwszym scanie). |
+| `warning` | string | (opcjonalne) Obecne tylko gdy ostatni scan był niepełny (`partial_scan`) — opis masowego „missing". |
 
 > Pełna dokumentacja tego endpointu również w `API_INFO.txt`. Dane dotyczą wyłącznie profilu **Mieszkania na wynajem — Lublin**.
 
@@ -196,7 +239,7 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 
 | Pole | Typ | Opis |
 |------|-----|------|
-| `status` | string | `"success"` / `"error"` / `"anomaly_detected"` / `"partial_anomaly"` / `"pending"` |
+| `status` | string | `"success"` / `"partial_scan"` / `"error"` / `"anomaly_detected"` / `"partial_anomaly"` / `"pending"` |
 | `timestamp` | string / null | Czas UTC w formacie ISO 8601 |
 | `timestamp_local` | string / null | Czas lokalny (CET/CEST) |
 | `duration_seconds` | int / null | Czas trwania scanu w sekundach |
@@ -207,6 +250,7 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | `profiles` | array | Szczegóły per profil (patrz niżej) |
 | `error` | string / null | Krótki opis błędu (max 200 znaków). Przy anomalii: komunikat o odrzuceniu scanu przez sanity check |
 | `error_detail` | string / null | Ostatnie 800 znaków traceback (tylko w `scan_status.json`). Przy anomalii: powody odrzucenia per profil |
+| `warning` | string / null | Ostrzeżenie o niepełnym scanie (status `partial_scan`). `null` gdy brak. Dane są zapisane — to nie błąd |
 
 ### Pola obiektu `profiles[]`
 
@@ -220,6 +264,7 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | `crosscheck` | string / null | Wynik weryfikacji: `"passed"`, `"passed_retry"`, `"consistent"`, `"best_of_two"`, `"anomaly_detected"`, `"error"` |
 | `anomaly_reasons` | array | (tylko przy anomalii) Lista powodów odrzucenia scanu przez sanity check |
 | `previous_good_count` | int / null | (tylko przy anomalii) Liczba ogłoszeń z ostatniego udanego scanu — punkt odniesienia |
+| `partial_scan_warning` | object | (tylko przy niepełnym scanie) `{missing_this_scan, base_count, scanned_count, missing_ratio, message}` — masowy „missing" w jednym scanie |
 
 > `listings_new` i `listings_removed` są liczone na podstawie porównania **ID ogłoszeń** (nie różnicy liczb),
 > więc są dokładne nawet gdy OLX zmienia kolejność wyników.
