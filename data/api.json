@@ -1,7 +1,14 @@
 {
-  "last_updated": "2026-07-18T08:52:12Z",
-  "total_listings": 828,
+  "last_updated": "2026-07-19T09:08:18Z",
+  "total_listings": 817,
   "scans": [
+    {
+      "date": "2026-07-19",
+      "timestamp": "2026-07-19T09:08:18Z",
+      "total_listings": 817,
+      "added": 22,
+      "removed": 28
+    },
     {
       "date": "2026-07-18",
       "timestamp": "2026-07-18T08:52:12Z",
@@ -15,13 +22,6 @@
       "total_listings": 830,
       "added": 33,
       "removed": 34
-    },
-    {
-      "date": "2026-07-16",
-      "timestamp": "2026-07-16T09:19:56Z",
-      "total_listings": 829,
-      "added": 42,
-      "removed": 31
     }
   ]
 }
