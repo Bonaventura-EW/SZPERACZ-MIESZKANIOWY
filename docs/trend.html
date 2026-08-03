@@ -82,6 +82,8 @@ body { font-family:var(--font-body); background:var(--bg-primary); color:var(--t
 .btn-reset-zoom { padding:7px 13px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-display); font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; transition:all var(--transition); display:none; align-items:center; justify-content:center; gap:6px; width:74px; }
 .btn-reset-zoom:hover { border-color:var(--accent); color:var(--accent); }
 .btn-reset-zoom.visible { display:inline-flex; }
+.range-tab:disabled { opacity:0.32; cursor:not-allowed; }
+.range-tab:disabled:hover { color:var(--text-secondary); background:transparent; }
 .chart-host { position:relative; flex:1 1 auto; min-width:0; width:100%; height:380px; }
 .watermark { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; z-index:0; opacity:0.05; user-select:none; }
 .watermark .w1 { font-family:var(--font-display); font-size:48px; font-weight:700; letter-spacing:0.14em; }
@@ -319,6 +321,23 @@ function buildUI(){
   renderAll();
 }
 
+// Wyszarza (blokuje) zakresy szersze niż dostępny przedział danych — inaczej
+// preset większy od historii pokazuje to samo co „Całość" i wygląda jak zepsuty.
+function updateRangeAvailability(groupId, spanDays){
+  document.querySelectorAll(`#${groupId} .range-tab`).forEach(btn=>{
+    const d = parseInt(btn.dataset.days, 10);
+    const tooWide = d > 0 && spanDays <= d;   // okno objęłoby całość danych
+    btn.disabled = tooWide;
+    btn.title = tooWide ? 'Za mało danych w tym zakresie' : '';
+    // jeśli aktywny zakres stał się niedostępny → wróć na „Całość"
+    if (tooWide && btn.classList.contains('active')){
+      btn.classList.remove('active');
+      const all = document.querySelector(`#${groupId} .range-tab[data-days="0"]`);
+      if (all){ all.classList.add('active'); }
+    }
+  });
+}
+
 function renderAll(){ render(); renderOutflow(); }
 function resetZoom(doRender){ zoomRange=null; const b=document.getElementById('btnResetZoom'); if(b) b.classList.remove('visible'); if(doRender) render(); }
 
@@ -333,7 +352,11 @@ function renderStats(allPts,anchorTs,anchorVal){
 }
 
 function render(){
-  const prof=PROFILES[currentProfile], all=prof.points; let pts;
+  const prof=PROFILES[currentProfile], all=prof.points;
+  const spanDays=(all[all.length-1][0]-all[0][0])/DAY_MS;
+  updateRangeAvailability('rangeTabs', spanDays);
+  if(currentDays>0 && spanDays<=currentDays) currentDays=0;
+  let pts;
   if(zoomRange){ pts=all.filter(p=>p[0]>=zoomRange[0]&&p[0]<=zoomRange[1]); if(pts.length<2) pts=all; }
   else if(currentDays>0){ const cutoff=all[all.length-1][0]-currentDays*86400000; pts=all.filter(p=>p[0]>=cutoff); if(pts.length<2) pts=all; }
   else pts=all;
@@ -397,12 +420,16 @@ function renderOutflow(){
   const prof=PROFILES[currentProfile], series=OUTFLOW[currentProfile]||[];
   const row=document.getElementById('outflowRow'), empty=document.getElementById('outflowEmpty'), stats=document.getElementById('oStats');
   if(!series.length){
+    updateRangeAvailability('outRangeTabs', 0);
     if(row) row.style.display='none';
     if(empty){ empty.style.display='block'; empty.textContent='Brak danych o odpływie dla tego profilu (nic nie trafiło jeszcze do archiwum).'; }
     if(stats) stats.innerHTML=''; viewOut=[]; geomO=null; return;
   }
   if(row) row.style.display=''; if(empty) empty.style.display='none';
   const lastTs=prof.points[prof.points.length-1][0]; let winMin,winMax;
+  const spanDays=(lastTs-series[0][0])/DAY_MS;
+  updateRangeAvailability('outRangeTabs', spanDays);
+  if(outDays>0 && spanDays<=outDays) outDays=0;
   if(outDays>0){ winMax=lastTs; winMin=lastTs-outDays*DAY_MS; } else { winMin=series[0][0]; winMax=Math.max(lastTs,series[series.length-1][0]); }
   let pts=series.filter(p=>p[0]>=winMin&&p[0]<=winMax); if(pts.length<1) pts=series; viewOut=pts;
   const total=pts.reduce((s,p)=>s+p[1],0), rate=pts.length?total/pts.length:0; let maxP=pts[0]; for(const p of pts) if(p[1]>maxP[1]) maxP=p;

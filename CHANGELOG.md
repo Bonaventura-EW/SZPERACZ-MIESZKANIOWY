@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.6.1] — 2026-08-03
+
+### 🐛 Fix: Przyciski zakresu na wykresie „Odpływ ofert" wyglądały na zepsute
+- Zakresy 1M/3M/6M/1R przełączały klasę `active`, ale wykresu nie zmieniały, bo dane o odpływie mają dopiero ~14 dni (archiwizacja z datą od 2026-07-20) — każdy preset szerszy niż historia pokazywał to samo co „Całość". To samo dotyczyło 6M/1R na wykresie głównym (90 dni historii).
+- `docs/trend.html`: nowa funkcja `updateRangeAvailability(groupId, spanDays)` blokuje (`disabled` + wyszarzenie, `title="Za mało danych w tym zakresie"`) presety szersze niż dostępny przedział danych, osobno dla każdego wykresu. Jeśli aktywny zakres stanie się niedostępny (np. po zmianie profilu), widok wraca do „Całość". Zakresy odblokowują się automatycznie wraz z narastaniem historii.
+
 ## [1.6.0] — 2026-08-03
 
 ### 📊 Feature: Nowa strona „Trend w czasie" (docs/trend.html)
