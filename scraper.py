@@ -1036,8 +1036,10 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 carried_missing.append(old_l)
                 log.info(f"  [MISSING 1×] {old_l['id']}: {old_l.get('title','')[:50]}")
 
-        if len(pd_["archived_listings"]) > 500:
-            pd_["archived_listings"] = pd_["archived_listings"][-500:]
+        # Archiwum zachowujemy w CAŁOŚCI i CIĄGLE — bez przycinania do ostatnich N.
+        # Wcześniejszy cap (500) usuwał najstarsze wpisy, przez co historia odpływu
+        # ofert (wykres „Odpływ ofert" w docs/trend.html) sięgała tylko ~14 dni wstecz.
+        # Pełne archiwum = pełna historia zniknięć ofert z rynku.
 
         # ── Czyszczenie: usuń z archived te, które właśnie reaktywowano ──
         # Bez tego ta sama oferta istnieje w obu listach (current + archived) — bug do 2026-05-19.

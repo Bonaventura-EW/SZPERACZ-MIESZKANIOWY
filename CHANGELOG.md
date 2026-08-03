@@ -2,6 +2,13 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.6.3] — 2026-08-03
+
+### 🛡️ Guard: Archiwum ofert zachowywane w całości i ciągle (bez cap 500)
+- `scraper.py` przycinał `archived_listings` do ostatnich 500 wpisów (`if len(...) > 500: [-500:]`), przez co najstarsze zniknięcia ofert były bezpowrotnie usuwane. Efekt: historia „Odpływ ofert" (`docs/trend.html`) sięgała tylko ~14 dni wstecz, mimo że trend liczy 90 dni. Lista dobiła do ~479/500, więc cap zaczynał aktywnie kasować dane.
+- Usunięto przycinanie — archiwum rośnie teraz w pełni i zachowuje kompletną historię zniknięć ofert z rynku. Od kolejnych scanów historia odpływu narasta bez końca, a zakresy 1M/3M/… na wykresie odblokowują się w miarę jej wzrostu.
+- Uwaga: wpisy usunięte przez wcześniejszy cap (sprzed ~2026-07-18) są nie do odzyskania — zmiana zapobiega dalszej utracie, nie odtwarza przeszłości.
+
 ## [1.6.2] — 2026-08-03
 
 ### 🐛 Fix: Zbyt ostre blokowanie zakresu 3M na wykresie trendu
