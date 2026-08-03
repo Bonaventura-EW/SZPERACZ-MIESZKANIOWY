@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SZPERACZ MIESZKANIOWY — Trend w czasie</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d0d14'/%3E%3Cpolygon points='32,10 54,30 50,30 50,54 14,54 14,30 10,30' fill='%2300e5ff' opacity='0.15'/%3E%3Cpolygon points='32,10 54,30 50,30 50,54 14,54 14,30 10,30' fill='none' stroke='%2300e5ff' stroke-width='2.5' stroke-linejoin='round'/%3E%3Crect x='24' y='38' width='10' height='16' rx='2' fill='%2300e5ff' opacity='0.4'/%3E%3Ccircle cx='43' cy='22' r='7' fill='none' stroke='%2300e5ff' stroke-width='2.5'/%3E%3Cline x1='48' y1='27' x2='54' y2='33' stroke='%2300e5ff' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-display: 'JetBrains Mono', ui-monospace, monospace;
+  --font-body: 'DM Sans', sans-serif;
+  --radius: 14px; --radius-sm: 8px;
+  --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="dark"] {
+  --bg-primary:#0a0d14; --bg-secondary:#10141f; --bg-card:#141928;
+  --bg-card-hover:#1a2035; --bg-accent:#141928;
+  --text-primary:#f0f2f8; --text-secondary:#8b96b0; --text-muted:#525d78;
+  --border:#1e2640; --border-light:#181f33;
+  --accent:#FFD700; --accent-dim:#c9a800;
+  --accent-glow:rgba(255,215,0,0.12); --accent-bg:rgba(255,215,0,0.07);
+  --blue:#1A3A6B; --blue-light:#2a5aaa;
+  --green:#10b981; --red:#ef4444; --orange:#f59e0b;
+  --scrollbar-bg:#10141f; --scrollbar-thumb:#1e2640;
+  --shadow:0 4px 32px rgba(0,0,0,0.5);
+  --shadow-accent:0 4px 20px rgba(255,215,0,0.15);
+}
+[data-theme="light"] {
+  --bg-primary:#f0f3fa; --bg-secondary:#ffffff; --bg-card:#ffffff;
+  --bg-card-hover:#f8faff; --bg-accent:#fffbeb;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+  --border:#e2e8f0; --border-light:#f1f5f9;
+  --accent:#d4a000; --accent-dim:#b38600;
+  --accent-glow:rgba(212,160,0,0.1); --accent-bg:rgba(212,160,0,0.06);
+  --blue:#1A3A6B; --blue-light:#2a5aaa;
+  --green:#059669; --red:#dc2626; --orange:#d97706;
+  --scrollbar-bg:#f0f3fa; --scrollbar-thumb:#cbd5e1;
+  --shadow:0 4px 24px rgba(0,0,0,0.08);
+  --shadow-accent:0 4px 20px rgba(212,160,0,0.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-bg); }
+body { font-family:var(--font-body); background:var(--bg-primary); color:var(--text-primary); min-height:100vh; transition:background var(--transition),color var(--transition); }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:var(--scrollbar-bg); }
+::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb); border-radius:3px; }
+
+.topbar { position:sticky; top:0; z-index:100; display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:var(--bg-secondary); border-bottom:1px solid var(--border); backdrop-filter:blur(12px); }
+.topbar-left { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.btn-back { display:flex; align-items:center; gap:6px; padding:7px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); background:none; color:var(--text-secondary); font-family:var(--font-display); font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); text-decoration:none; }
+.btn-back:hover { border-color:var(--accent); color:var(--accent); }
+.logo { font-family:var(--font-display); font-size:17px; font-weight:700; color:var(--accent); letter-spacing:-0.5px; text-decoration:none; }
+.logo span { color:var(--text-muted); font-weight:400; }
+.page-title { font-family:var(--font-display); font-size:13px; color:var(--text-muted); padding-left:14px; border-left:1px solid var(--border); }
+.btn-theme { width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:var(--bg-card); color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:17px; transition:all var(--transition); }
+.btn-theme:hover { border-color:var(--accent); color:var(--accent); }
+
+.container { max-width:1150px; margin:0 auto; padding:20px 24px 24px; }
+
+.controls { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+.ctrl-label { font-family:var(--font-display); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-muted); }
+.profile-select { background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 14px; font-family:var(--font-body); font-size:14px; font-weight:600; cursor:pointer; outline:none; min-width:280px; transition:border-color var(--transition); }
+.profile-select:hover { border-color:var(--accent); }
+
+.chart-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:26px 28px 18px; position:relative; overflow:hidden; box-shadow:var(--shadow); }
+.chart-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--accent),var(--blue-light)); }
+.chart-card.outflow { margin-top:20px; }
+.chart-card.outflow::before { background:linear-gradient(90deg,#e8624c,#f0a35e); }
+.c-title { font-family:var(--font-display); font-size:22px; font-weight:700; letter-spacing:-0.3px; }
+.c-sub { margin-top:6px; font-family:var(--font-display); font-size:13px; color:var(--text-secondary); }
+.c-stats { margin-top:14px; display:flex; gap:22px; flex-wrap:wrap; font-family:var(--font-display); font-size:14px; font-weight:700; }
+.c-stats .lab { color:var(--text-muted); font-weight:600; margin-right:5px; }
+.up { color:var(--green); } .down { color:var(--red); } .flat { color:var(--text-muted); }
+
+.chart-row { display:flex; gap:16px; align-items:stretch; margin-top:16px; }
+.range-side { display:flex; flex-direction:column; gap:6px; flex:0 0 auto; padding-top:2px; }
+.range-tab { padding:7px 13px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-display); font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; transition:all var(--transition); width:74px; text-align:center; }
+.range-tab:hover { color:var(--text-primary); background:var(--bg-accent); }
+.range-tab.active { color:var(--accent); background:var(--accent-glow); border-color:var(--accent); }
+.btn-reset-zoom { padding:7px 13px; border:1px solid var(--border); background:transparent; color:var(--text-secondary); font-family:var(--font-display); font-size:12px; font-weight:600; border-radius:var(--radius-sm); cursor:pointer; transition:all var(--transition); display:none; align-items:center; justify-content:center; gap:6px; width:74px; }
+.btn-reset-zoom:hover { border-color:var(--accent); color:var(--accent); }
+.btn-reset-zoom.visible { display:inline-flex; }
+.chart-host { position:relative; flex:1 1 auto; min-width:0; width:100%; height:380px; }
+.watermark { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; z-index:0; opacity:0.05; user-select:none; }
+.watermark .w1 { font-family:var(--font-display); font-size:48px; font-weight:700; letter-spacing:0.14em; }
+.watermark .w2 { font-family:var(--font-display); font-size:12px; letter-spacing:0.35em; margin-top:4px; }
+#trendCanvas, #outflowCanvas { position:relative; z-index:1; width:100%; height:100%; display:block; cursor:crosshair; }
+.chart-hint { margin-top:10px; font-family:var(--font-display); font-size:10px; color:var(--text-muted); opacity:0.8; }
+.chart-tooltip { position:absolute; z-index:5; pointer-events:none; opacity:0; transition:opacity 0.12s; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 11px; font-family:var(--font-display); font-size:12px; box-shadow:var(--shadow); white-space:nowrap; transform:translate(-50%,-120%); }
+.chart-tooltip .tt-date { color:var(--text-muted); font-size:10px; margin-bottom:3px; }
+.chart-tooltip .tt-val { color:var(--text-primary); font-weight:700; font-size:14px; }
+.chart-tooltip .tt-ma { color:#f0a35e; font-size:10px; margin-top:2px; }
+.chart-legend { margin-top:14px; display:flex; gap:20px; flex-wrap:wrap; font-family:var(--font-display); font-size:11px; color:var(--text-muted); }
+.chart-legend .dot { display:inline-block; width:18px; height:0; border-top-width:2px; border-top-style:dashed; vertical-align:middle; margin-right:6px; }
+
+.loading { text-align:center; padding:80px 20px; color:var(--text-muted); font-family:var(--font-display); font-size:13px; }
+.loading-dot { display:inline-block; animation:blink 1.2s infinite; }
+.loading-dot:nth-child(2) { animation-delay:0.2s; }
+.loading-dot:nth-child(3) { animation-delay:0.4s; }
+@keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+
+.footer { text-align:center; padding:24px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border); margin-top:12px; }
+.footer a { color:var(--accent); text-decoration:none; }
+
+@media (max-width:768px) {
+  .topbar { padding:10px 16px; }
+  .container { padding:16px; }
+  .page-title { display:none; }
+  .profile-select { min-width:100%; }
+  .chart-row { flex-direction:column; }
+  .range-side { flex-direction:row; flex-wrap:wrap; }
+  .range-tab, .btn-reset-zoom { width:auto; }
+  .chart-host { height:300px; }
+  .c-stats { gap:14px; font-size:13px; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <a href="index.html" class="btn-back">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Dashboard
+    </a>
+    <a href="index.html" class="logo">🏠 SZPERACZ <span>MIESZKANIOWY</span></a>
+    <span class="page-title">Trend w czasie</span>
+  </div>
+  <div>
+    <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" title="Przełącz motyw">🌙</button>
+  </div>
+</header>
+
+<main class="container">
+  <div id="pageContent">
+    <div class="loading">Ładowanie danych<span class="loading-dot">.</span><span class="loading-dot">.</span><span class="loading-dot">.</span></div>
+  </div>
+</main>
+
+<div class="footer">
+  SZPERACZ MIESZKANIOWY &copy; 2026 &middot;
+  <a href="https://github.com/Bonaventura-EW/SZPERACZ-MIESZKANIOWY" target="_blank">GitHub</a>
+</div>
+
+<script>
+const GITHUB_OWNER = 'Bonaventura-EW';
+const GITHUB_REPO  = 'SZPERACZ-MIESZKANIOWY';
+const DATA_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/data/dashboard_data.json`;
+
+const PL_MONTHS = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
+const DAY_MS = 86400000;
+const toTs = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y, m-1, d); };
+function fmtDate(ts){ const d=new Date(ts); return String(d.getUTCDate()).padStart(2,'0')+'.'+String(d.getUTCMonth()+1).padStart(2,'0')+'.'+d.getUTCFullYear(); }
+function fmtDateLong(ts){ const d=new Date(ts); return String(d.getUTCDate()).padStart(2,'0')+' '+PL_MONTHS[d.getUTCMonth()]+' '+d.getUTCFullYear(); }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+function plForm(n){ n=Math.abs(n); if(n===1) return 'ogłoszenie'; const t=n%10,h=n%100; if(t>=2&&t<=4&&!(h>=12&&h<=14)) return 'ogłoszenia'; return 'ogłoszeń'; }
+
+// Sparse [{date,count}] → ciągła dzienna seria [[ts,count]] (dni bez odpływu = 0),
+// rozciągnięta do endTs (dziś), by okna zakresów pasowały.
+function expandDaily(arr, endTs){
+  if(!arr||!arr.length) return [];
+  const map={}; for(const o of arr) map[toTs(o.date)]=o.count;
+  const startTs=toTs(arr[0].date);
+  const lastTs=Math.max(toTs(arr[arr.length-1].date), endTs||0);
+  const out=[]; for(let t=startTs;t<=lastTs;t+=DAY_MS) out.push([t, map[t]||0]); return out;
+}
+// Dokłada trailing average z okna `win` dni → [[ts,count,ma]]
+function outflowWithMA(series, win){
+  const out=[];
+  for(let i=0;i<series.length;i++){ let s=0,n=0; for(let j=Math.max(0,i-win+1);j<=i;j++){ s+=series[j][1]; n++; } out.push([series[i][0], series[i][1], n?s/n:0]); }
+  return out;
+}
+// Liczy dzienny odpływ z archived_listings → sparse [{date,count}] wg dnia archiwizacji
+function outflowFromArchived(archived){
+  const map={};
+  for(const a of (archived||[])){
+    const raw=a.archived_date || a.archived_at; if(!raw) continue;
+    const day=String(raw).split(' ')[0].split('T')[0];
+    map[day]=(map[day]||0)+1;
+  }
+  return Object.keys(map).sort().map(d=>({date:d, count:map[d]}));
+}
+
+let PROFILES={}, scanTime=null, currentProfile=null;
+let currentDays=0, outDays=0, zoomRange=null, hoverIndex=-1;
+let viewPts=[], geom=null;
+let isDragging=false, dragStartX=null, dragCurX=null;
+let OUTFLOW={}, viewOut=[], geomO=null, hoverO=-1;
+
+function toggleTheme(){
+  const html=document.documentElement;
+  const next=html.getAttribute('data-theme')==='dark'?'light':'dark';
+  html.setAttribute('data-theme', next);
+  document.getElementById('btnTheme').textContent = next==='dark'?'🌙':'☀️';
+  localStorage.setItem('szperacz-theme', next);
+  if(viewPts.length) draw(); if(viewOut.length) drawOutflow();
+}
+(function initTheme(){
+  const saved=localStorage.getItem('szperacz-theme');
+  if(saved){ document.documentElement.setAttribute('data-theme', saved); document.getElementById('btnTheme').textContent = saved==='dark'?'🌙':'☀️'; }
+})();
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+async function loadAndRender(){
+  let data;
+  try {
+    const resp = await fetch(DATA_URL + `?t=${Date.now()}`);
+    data = await resp.json();
+  } catch(e){
+    document.getElementById('pageContent').innerHTML =
+      `<div class="loading" style="color:var(--red)">Błąd ładowania danych: ${e.message}</div>`;
+    return;
+  }
+
+  if(data.last_scan){ const d=new Date(String(data.last_scan).replace(' ','T')); if(!isNaN(d)) scanTime=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+  PROFILES={}; OUTFLOW={};
+  for(const [key,p] of Object.entries(data.profiles || {})){
+    const points = (p.daily_counts || []).map(dc => [toTs(dc.date), dc.count]).sort((a,b)=>a[0]-b[0]);
+    if(!points.length) continue;
+    PROFILES[key] = { label: p.label || key, is_category: !!p.is_category, points };
+    const endTs = points[points.length-1][0];
+    OUTFLOW[key] = outflowWithMA(expandDaily(outflowFromArchived(p.archived_listings), endTs), 7);
+  }
+  if(!Object.keys(PROFILES).length){
+    document.getElementById('pageContent').innerHTML = `<div class="loading">Brak danych historycznych.</div>`;
+    return;
+  }
+  buildUI();
+}
+
+function buildUI(){
+  document.getElementById('pageContent').innerHTML = `
+    <div class="controls">
+      <span class="ctrl-label">Profil / kategoria</span>
+      <select class="profile-select" id="profileSel"></select>
+    </div>
+    <div class="chart-card">
+      <div class="c-title" id="cTitle">—</div>
+      <div class="c-sub" id="cSub">—</div>
+      <div class="c-stats" id="cStats"></div>
+      <div class="chart-row">
+        <div class="chart-host">
+          <div class="watermark"><div class="w1">SZPERACZ</div><div class="w2">OLX · LUBLIN</div></div>
+          <canvas id="trendCanvas"></canvas>
+          <div class="chart-tooltip" id="tooltip"></div>
+        </div>
+        <div class="range-side" id="rangeTabs">
+          <button class="range-tab" data-days="30">1M</button>
+          <button class="range-tab" data-days="90">3M</button>
+          <button class="range-tab" data-days="180">6M</button>
+          <button class="range-tab" data-days="365">1R</button>
+          <button class="range-tab active" data-days="0">Całość</button>
+          <button class="btn-reset-zoom" id="btnResetZoom" title="Resetuj przybliżenie">⟲ Reset</button>
+        </div>
+      </div>
+      <div class="chart-hint">Przeciągnij po wykresie, aby przybliżyć zakres · „Reset”, by wrócić</div>
+      <div class="chart-legend">
+        <span><span class="dot" style="border-top-color:var(--red)"></span>Maksimum w oknie</span>
+        <span><span class="dot" style="border-top-color:var(--green)"></span>Minimum w oknie</span>
+        <span><span class="dot" style="border-top-color:var(--accent)"></span>Wartość bieżąca</span>
+      </div>
+    </div>
+
+    <div class="chart-card outflow">
+      <div class="c-title">📉 Odpływ ofert</div>
+      <div class="c-sub">Ile ogłoszeń znika z rynku — dzienny odpływ + średnia 7-dniowa</div>
+      <div class="c-stats" id="oStats"></div>
+      <div class="chart-row" id="outflowRow">
+        <div class="chart-host" id="outflowHost">
+          <div class="watermark"><div class="w1">SZPERACZ</div><div class="w2">OLX · LUBLIN</div></div>
+          <canvas id="outflowCanvas"></canvas>
+          <div class="chart-tooltip" id="tooltipO"></div>
+        </div>
+        <div class="range-side" id="outRangeTabs">
+          <button class="range-tab" data-days="30">1M</button>
+          <button class="range-tab" data-days="90">3M</button>
+          <button class="range-tab" data-days="180">6M</button>
+          <button class="range-tab" data-days="365">1R</button>
+          <button class="range-tab active" data-days="0">Całość</button>
+        </div>
+      </div>
+      <div class="loading" id="outflowEmpty" style="display:none; padding:60px 20px"></div>
+      <div class="chart-legend">
+        <span><span class="dot" style="border-top-color:#e8624c;border-top-style:solid;border-top-width:2px"></span>Znikło danego dnia</span>
+        <span><span class="dot" style="border-top-color:#f0a35e;border-top-style:solid;border-top-width:3px"></span>Średnia 7 dni</span>
+      </div>
+      <div class="chart-hint">Źródło: dla każdego dnia liczba ogłoszeń zarchiwizowanych tego dnia (zniknęły z OLX)</div>
+    </div>
+  `;
+
+  const sel = document.getElementById('profileSel');
+  const entries = Object.entries(PROFILES);
+  entries.sort((a,b)=>{
+    if(a[1].is_category !== b[1].is_category) return a[1].is_category ? -1 : 1;
+    return a[1].label.localeCompare(b[1].label, 'pl');
+  });
+  for(const [key,p] of entries){
+    const o=document.createElement('option');
+    o.value=key; o.textContent=(p.is_category?'📊 ':'👤 ')+p.label;
+    sel.appendChild(o);
+  }
+  currentProfile = entries[0][0];
+  sel.value = currentProfile;
+  sel.addEventListener('change', e => { currentProfile=e.target.value; resetZoom(false); hoverIndex=-1; hoverO=-1; renderAll(); });
+
+  document.querySelectorAll('#rangeTabs .range-tab').forEach(btn=>{ btn.addEventListener('click',()=>{ document.querySelectorAll('#rangeTabs .range-tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); currentDays=parseInt(btn.dataset.days,10); resetZoom(false); hoverIndex=-1; render(); }); });
+  document.getElementById('btnResetZoom').addEventListener('click',()=>resetZoom(true));
+  document.querySelectorAll('#outRangeTabs .range-tab').forEach(btn=>{ btn.addEventListener('click',()=>{ document.querySelectorAll('#outRangeTabs .range-tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); outDays=parseInt(btn.dataset.days,10); hoverO=-1; renderOutflow(); }); });
+
+  const canvas=document.getElementById('trendCanvas');
+  canvas.addEventListener('mousemove',onMove); canvas.addEventListener('mouseleave',onLeave); canvas.addEventListener('mousedown',onDown); window.addEventListener('mouseup',onUp);
+  const oCanvas=document.getElementById('outflowCanvas');
+  if(oCanvas){ oCanvas.addEventListener('mousemove',onMoveO); oCanvas.addEventListener('mouseleave',onLeaveO); }
+  let rT; window.addEventListener('resize',()=>{ clearTimeout(rT); rT=setTimeout(()=>{ if(viewPts.length) draw(); if(viewOut.length) drawOutflow(); },120); });
+
+  renderAll();
+}
+
+function renderAll(){ render(); renderOutflow(); }
+function resetZoom(doRender){ zoomRange=null; const b=document.getElementById('btnResetZoom'); if(b) b.classList.remove('visible'); if(doRender) render(); }
+
+function refAt(points,targetTs){ let chosen=null; for(const p of points){ if(p[0]<=targetTs) chosen=p; else break; } return chosen; }
+function renderStats(allPts,anchorTs,anchorVal){
+  const cur=anchorVal,lastTs=anchorTs,firstTs=allPts[0][0],DAY=86400000;
+  const defs=[['1D',1],['1M',30],['6M',182],['1R',365]]; let html='';
+  for(const [lab,days] of defs){ const target=lastTs-days*DAY; let cls='flat',txt='—';
+    if(firstTs<=target){ const ref=refAt(allPts,target); if(ref){ const diff=cur-ref[1]; cls=diff>0?'up':(diff<0?'down':'flat'); txt=(diff>0?'+':'')+diff; } }
+    html+=`<span><span class="lab">${lab}:</span><span class="${cls}">${txt}</span></span>`; }
+  document.getElementById('cStats').innerHTML=html;
+}
+
+function render(){
+  const prof=PROFILES[currentProfile], all=prof.points; let pts;
+  if(zoomRange){ pts=all.filter(p=>p[0]>=zoomRange[0]&&p[0]<=zoomRange[1]); if(pts.length<2) pts=all; }
+  else if(currentDays>0){ const cutoff=all[all.length-1][0]-currentDays*86400000; pts=all.filter(p=>p[0]>=cutoff); if(pts.length<2) pts=all; }
+  else pts=all;
+  viewPts=pts;
+  const curTs=pts[pts.length-1][0], cur=pts[pts.length-1][1];
+  document.getElementById('cTitle').textContent=prof.label;
+  const timePart=scanTime?`, ${scanTime}`:''; document.getElementById('cSub').textContent=`${fmtDate(curTs)}${timePart} (${cur})`;
+  renderStats(all,curTs,cur); draw();
+}
+
+function niceStep(range,ticks){ const raw=range/ticks; const pow=Math.pow(10,Math.floor(Math.log10(raw))); const c=[1,2,2.5,5,10].map(m=>m*pow); return c.find(x=>x>=raw)||c[c.length-1]; }
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function hexA(c,a){ c=c.trim(); if(c.startsWith('#')){ const n=parseInt(c.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; } if(c.startsWith('rgb')) return c.replace(/rgba?\(([^)]+)\)/,(_,i)=>{ const p=i.split(',').slice(0,3).map(s=>s.trim()); return `rgba(${p.join(',')},${a})`; }); return c; }
+function drawHLine(ctx,x1,x2,y,color,alpha){ ctx.strokeStyle=color; ctx.globalAlpha=alpha; ctx.lineWidth=1; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; }
+function drawDot(ctx,x,y,color,r=4,ring=false){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=color; ctx.fill(); ctx.lineWidth=ring?2:1.5; ctx.strokeStyle='#fff'; ctx.stroke(); }
+function drawTag(ctx,text,x,y,bg,fg,anchor,maxX){ ctx.font='bold 11px "JetBrains Mono", monospace'; const padX=7,h=18,w=ctx.measureText(text).width+padX*2; let rx; if(anchor==='center') rx=x-w/2; else if(anchor==='left') rx=x+1; else rx=x-w; rx=Math.max(2,Math.min(rx,maxX-w-2)); const ry=y-h/2; roundRect(ctx,rx,ry,w,h,4); ctx.fillStyle=bg; ctx.fill(); ctx.fillStyle=fg; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text,rx+w/2,y); }
+
+function draw(){
+  const canvas=document.getElementById('trendCanvas'), host=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1, W=host.clientWidth, H=host.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr; const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); if(!viewPts.length) return;
+  const col={ text:cssVar('--text-secondary'), muted:cssVar('--text-muted'), grid:cssVar('--border'), accent:cssVar('--accent'), green:cssVar('--green'), red:cssVar('--red') };
+  const padL=52,padR=18,padT=34,padB=30, plotW=W-padL-padR, plotH=H-padT-padB;
+  const counts=viewPts.map(p=>p[1]); const cMax=Math.max(...counts), cMin=Math.min(...counts);
+  let maxV=cMax,minV=cMin; if(maxV===minV){ maxV+=1; minV=Math.max(0,minV-1); }
+  const span=maxV-minV; let yMin=Math.max(0,minV-span*0.18), yMax=maxV+span*0.18;
+  const step=niceStep(yMax-yMin,5); yMin=Math.floor(yMin/step)*step; yMax=Math.ceil(yMax/step)*step;
+  const t0=viewPts[0][0], t1=viewPts[viewPts.length-1][0], tSpan=Math.max(1,t1-t0);
+  const xOf=ts=>padL+(ts-t0)/tSpan*plotW, yOf=v=>padT+(1-(v-yMin)/(yMax-yMin))*plotH;
+  ctx.font='11px "JetBrains Mono", monospace'; ctx.textBaseline='middle';
+  ctx.strokeStyle=col.grid; ctx.fillStyle=col.muted; ctx.lineWidth=1;
+  for(let v=yMin;v<=yMax+1e-6;v+=step){ const y=yOf(v); ctx.globalAlpha=0.5; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.textAlign='right'; ctx.fillText(String(Math.round(v)),padL-8,y); }
+  ctx.textAlign='center'; ctx.fillStyle=col.muted;
+  const d0=new Date(t0); let my=d0.getUTCFullYear(),mm=d0.getUTCMonth(),curM=Date.UTC(my,mm,1);
+  if(curM<t0){ mm++; if(mm>11){mm=0;my++;} curM=Date.UTC(my,mm,1); }
+  let lastLabelX=-1e9; const minGap=46;
+  while(curM<=t1){ const x=xOf(curM); if(x-lastLabelX>minGap){ const dd=new Date(curM); ctx.fillText(`${PL_MONTHS[dd.getUTCMonth()]} '${String(dd.getUTCFullYear()).slice(2)}`,x,H-padB+14); ctx.strokeStyle=col.grid; ctx.globalAlpha=0.25; ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke(); ctx.globalAlpha=1; lastLabelX=x; } mm++; if(mm>11){mm=0;my++;} curM=Date.UTC(my,mm,1); }
+  const acc=col.accent;
+  const grad=ctx.createLinearGradient(0,padT,0,H-padB); grad.addColorStop(0,hexA(acc,0.38)); grad.addColorStop(1,hexA(acc,0.02));
+  ctx.beginPath(); ctx.moveTo(xOf(viewPts[0][0]),yOf(viewPts[0][1])); for(const p of viewPts) ctx.lineTo(xOf(p[0]),yOf(p[1])); ctx.lineTo(xOf(t1),H-padB); ctx.lineTo(xOf(t0),H-padB); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(xOf(viewPts[0][0]),yOf(viewPts[0][1])); for(const p of viewPts) ctx.lineTo(xOf(p[0]),yOf(p[1])); ctx.strokeStyle=acc; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+  const maxP=viewPts.find(p=>p[1]===cMax), minP=viewPts.slice().reverse().find(p=>p[1]===cMin), last=viewPts[viewPts.length-1];
+  drawHLine(ctx,padL,W-padR,yOf(cMax),col.red,0.5); drawHLine(ctx,padL,W-padR,yOf(cMin),col.green,0.5); drawHLine(ctx,padL,W-padR,yOf(last[1]),acc,0.55);
+  drawDot(ctx,xOf(maxP[0]),yOf(maxP[1]),col.red); drawTag(ctx,`MAX: ${maxP[1]}`,xOf(maxP[0]),yOf(maxP[1])-16,col.red,'#fff','center',W);
+  drawDot(ctx,xOf(minP[0]),yOf(minP[1]),col.green); drawTag(ctx,`MIN: ${minP[1]}`,xOf(minP[0]),yOf(minP[1])+16,col.green,'#0b0e14','center',W);
+  drawTag(ctx,String(last[1]),padL,yOf(last[1]),acc,'#0b0e14','left',W);
+  if(!isDragging && hoverIndex>=0 && hoverIndex<viewPts.length){ const p=viewPts[hoverIndex],x=xOf(p[0]),y=yOf(p[1]); ctx.strokeStyle=col.muted; ctx.globalAlpha=0.6; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; drawDot(ctx,x,y,acc,5,true); }
+  if(isDragging && dragStartX!=null && dragCurX!=null){ const a=clamp(Math.min(dragStartX,dragCurX),padL,W-padR),b=clamp(Math.max(dragStartX,dragCurX),padL,W-padR); ctx.fillStyle=hexA(acc,0.15); ctx.fillRect(a,padT,b-a,plotH); ctx.strokeStyle=hexA(acc,0.6); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(a,padT); ctx.lineTo(a,H-padB); ctx.moveTo(b,padT); ctx.lineTo(b,H-padB); ctx.stroke(); }
+  geom={ padL,padR,padT,padB,plotW,plotH,t0,t1,tSpan,xOf,yOf,W,H };
+}
+
+function mouseX(e){ const rect=document.getElementById('trendCanvas').getBoundingClientRect(); return e.clientX-rect.left; }
+const tipEl=()=>document.getElementById('tooltip');
+function onDown(e){ if(!geom) return; const mx=mouseX(e); if(mx<geom.padL||mx>geom.W-geom.padR) return; isDragging=true; dragStartX=mx; dragCurX=mx; hoverIndex=-1; const tt=tipEl(); if(tt) tt.style.opacity='0'; e.preventDefault(); }
+function onMove(e){ if(!geom||!viewPts.length) return; const mx=mouseX(e); if(isDragging){ dragCurX=clamp(mx,geom.padL,geom.W-geom.padR); draw(); return; } const ts=geom.t0+(mx-geom.padL)/geom.plotW*geom.tSpan; let best=0,bestD=Infinity; for(let i=0;i<viewPts.length;i++){ const d=Math.abs(viewPts[i][0]-ts); if(d<bestD){bestD=d;best=i;} } hoverIndex=best; draw(); const p=viewPts[best],tt=tipEl(); tt.innerHTML=`<div class="tt-date">${fmtDateLong(p[0])}</div><div class="tt-val">${p[1]} ogłoszeń</div>`; tt.style.left=geom.xOf(p[0])+'px'; tt.style.top=geom.yOf(p[1])+'px'; tt.style.opacity='1'; }
+function onUp(){ if(!isDragging) return; isDragging=false; const a=Math.min(dragStartX,dragCurX),b=Math.max(dragStartX,dragCurX); dragStartX=dragCurX=null; if(!geom||b-a<8){ draw(); return; } let tsA=geom.t0+(a-geom.padL)/geom.plotW*geom.tSpan, tsB=geom.t0+(b-geom.padL)/geom.plotW*geom.tSpan; const all=PROFILES[currentProfile].points; const inRange=all.filter(p=>p[0]>=tsA&&p[0]<=tsB); if(inRange.length<2){ draw(); return; } zoomRange=[tsA,tsB]; document.getElementById('btnResetZoom').classList.add('visible'); hoverIndex=-1; render(); }
+function onLeave(){ if(isDragging){ isDragging=false; dragStartX=dragCurX=null; draw(); } hoverIndex=-1; const tt=tipEl(); if(tt) tt.style.opacity='0'; if(viewPts.length) draw(); }
+
+function renderOutflow(){
+  const prof=PROFILES[currentProfile], series=OUTFLOW[currentProfile]||[];
+  const row=document.getElementById('outflowRow'), empty=document.getElementById('outflowEmpty'), stats=document.getElementById('oStats');
+  if(!series.length){
+    if(row) row.style.display='none';
+    if(empty){ empty.style.display='block'; empty.textContent='Brak danych o odpływie dla tego profilu (nic nie trafiło jeszcze do archiwum).'; }
+    if(stats) stats.innerHTML=''; viewOut=[]; geomO=null; return;
+  }
+  if(row) row.style.display=''; if(empty) empty.style.display='none';
+  const lastTs=prof.points[prof.points.length-1][0]; let winMin,winMax;
+  if(outDays>0){ winMax=lastTs; winMin=lastTs-outDays*DAY_MS; } else { winMin=series[0][0]; winMax=Math.max(lastTs,series[series.length-1][0]); }
+  let pts=series.filter(p=>p[0]>=winMin&&p[0]<=winMax); if(pts.length<1) pts=series; viewOut=pts;
+  const total=pts.reduce((s,p)=>s+p[1],0), rate=pts.length?total/pts.length:0; let maxP=pts[0]; for(const p of pts) if(p[1]>maxP[1]) maxP=p;
+  stats.innerHTML=`<span><span class="lab">Śr./dzień:</span><span class="down">${rate.toFixed(1).replace('.',',')}</span></span>`+
+    `<span><span class="lab">Rekord:</span><span class="down">${maxP[1]}</span><span style="color:var(--text-muted);font-weight:600;margin-left:5px">(${fmtDate(maxP[0])})</span></span>`+
+    `<span><span class="lab">Suma w oknie:</span><span>${total}</span></span>`;
+  drawOutflow();
+}
+
+function drawOutflow(){
+  const canvas=document.getElementById('outflowCanvas'); if(!canvas) return; const host=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1, W=host.clientWidth, H=host.clientHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr; const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); if(!viewOut.length) return;
+  const col={ muted:cssVar('--text-muted'), grid:cssVar('--border') };
+  const padL=52,padR=18,padT=34,padB=30, plotW=W-padL-padR, plotH=H-padT-padB;
+  const counts=viewOut.map(p=>p[1]); const maxV=Math.max(...counts,1); const step=niceStep(maxV*1.15,5); let yMax=Math.ceil((maxV*1.12)/step)*step; if(yMax<=0) yMax=step; const yMin=0;
+  const t0=viewOut[0][0], t1=viewOut[viewOut.length-1][0], tSpan=Math.max(1,t1-t0);
+  const xOf=ts=>padL+(ts-t0)/tSpan*plotW, yOf=v=>padT+(1-(v-yMin)/(yMax-yMin))*plotH;
+  ctx.font='11px "JetBrains Mono", monospace'; ctx.textBaseline='middle';
+  ctx.strokeStyle=col.grid; ctx.fillStyle=col.muted; ctx.lineWidth=1;
+  for(let v=yMin;v<=yMax+1e-6;v+=step){ const y=yOf(v); ctx.globalAlpha=0.5; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.textAlign='right'; ctx.fillText(String(Math.round(v)),padL-8,y); }
+  ctx.textAlign='center'; ctx.fillStyle=col.muted;
+  const d0=new Date(t0); let my=d0.getUTCFullYear(),mm=d0.getUTCMonth(),curM=Date.UTC(my,mm,1);
+  if(curM<t0){ mm++; if(mm>11){mm=0;my++;} curM=Date.UTC(my,mm,1); }
+  let lastLabelX=-1e9; const minGap=46;
+  while(curM<=t1){ const x=xOf(curM); if(x-lastLabelX>minGap){ const dd=new Date(curM); ctx.fillText(`${PL_MONTHS[dd.getUTCMonth()]} '${String(dd.getUTCFullYear()).slice(2)}`,x,H-padB+14); ctx.strokeStyle=col.grid; ctx.globalAlpha=0.25; ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke(); ctx.globalAlpha=1; lastLabelX=x; } mm++; if(mm>11){mm=0;my++;} curM=Date.UTC(my,mm,1); }
+  const CORAL='#e8624c', AMBER='#f0a35e';
+  const grad=ctx.createLinearGradient(0,padT,0,H-padB); grad.addColorStop(0,hexA(CORAL,0.16)); grad.addColorStop(1,hexA(CORAL,0.01));
+  ctx.beginPath(); ctx.moveTo(xOf(viewOut[0][0]),yOf(viewOut[0][1])); for(const p of viewOut) ctx.lineTo(xOf(p[0]),yOf(p[1])); ctx.lineTo(xOf(t1),H-padB); ctx.lineTo(xOf(t0),H-padB); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(xOf(viewOut[0][0]),yOf(viewOut[0][1])); for(const p of viewOut) ctx.lineTo(xOf(p[0]),yOf(p[1])); ctx.strokeStyle=hexA(CORAL,0.92); ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+  const n=viewOut.length; ctx.beginPath(); ctx.moveTo(xOf(viewOut[0][0]),yOf(viewOut[0][2]));
+  if(n<3){ for(const p of viewOut) ctx.lineTo(xOf(p[0]),yOf(p[2])); }
+  else { for(let i=1;i<n-1;i++){ const xc=(xOf(viewOut[i][0])+xOf(viewOut[i+1][0]))/2, yc=(yOf(viewOut[i][2])+yOf(viewOut[i+1][2]))/2; ctx.quadraticCurveTo(xOf(viewOut[i][0]),yOf(viewOut[i][2]),xc,yc); } ctx.quadraticCurveTo(xOf(viewOut[n-2][0]),yOf(viewOut[n-2][2]),xOf(viewOut[n-1][0]),yOf(viewOut[n-1][2])); }
+  ctx.strokeStyle=AMBER; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+  let maxP=viewOut[0]; for(const p of viewOut) if(p[1]>maxP[1]) maxP=p;
+  if(maxP[1]>0){ drawDot(ctx,xOf(maxP[0]),yOf(maxP[1]),CORAL); drawTag(ctx,`MAX: ${maxP[1]}`,xOf(maxP[0]),yOf(maxP[1])-16,CORAL,'#fff','center',W); }
+  if(hoverO>=0 && hoverO<viewOut.length){ const p=viewOut[hoverO],x=xOf(p[0]); ctx.strokeStyle=col.muted; ctx.globalAlpha=0.6; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; drawDot(ctx,x,yOf(p[2]),AMBER,4,true); drawDot(ctx,x,yOf(p[1]),CORAL,4,true); }
+  geomO={ padL,padR,padT,padB,plotW,plotH,t0,t1,tSpan,xOf,yOf,W,H };
+}
+function onMoveO(e){ if(!geomO||!viewOut.length) return; const rect=document.getElementById('outflowCanvas').getBoundingClientRect(); const mx=e.clientX-rect.left; const ts=geomO.t0+(mx-geomO.padL)/geomO.plotW*geomO.tSpan; let best=0,bestD=Infinity; for(let i=0;i<viewOut.length;i++){ const d=Math.abs(viewOut[i][0]-ts); if(d<bestD){bestD=d;best=i;} } hoverO=best; drawOutflow(); const p=viewOut[best],tt=document.getElementById('tooltipO'); tt.innerHTML=`<div class="tt-date">${fmtDateLong(p[0])}</div><div class="tt-val">${p[1]} ${plForm(p[1])}</div><div class="tt-ma">śr. 7 dni: ${p[2].toFixed(1).replace('.',',')}</div>`; tt.style.left=geomO.xOf(p[0])+'px'; tt.style.top=geomO.yOf(Math.max(p[1],p[2]))+'px'; tt.style.opacity='1'; }
+function onLeaveO(){ hoverO=-1; const tt=document.getElementById('tooltipO'); if(tt) tt.style.opacity='0'; if(viewOut.length) drawOutflow(); }
+
+loadAndRender();
+</script>
+</body>
+</html>

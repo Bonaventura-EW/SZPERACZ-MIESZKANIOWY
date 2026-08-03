@@ -2,6 +2,16 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.6.0] — 2026-08-03
+
+### 📊 Feature: Nowa strona „Trend w czasie" (docs/trend.html)
+- Wzorowana na bliźniaczym projekcie SZPERACZ (`trend.html`), dostosowana do danych i kolorystyki tego projektu (akcent złoty `#FFD700`, spójny z `docs/index.html`).
+- Dwa interaktywne wykresy na czystym Canvas (zero zewnętrznych zależności):
+  - **Trend w czasie** — liczba aktywnych ofert w czasie (linia + gradient), znaczniki MAX/MIN/wartość bieżąca, statystyki zmiany 1D/1M/6M/1R, przełączniki zakresu 1M/3M/6M/1R/Całość, przeciąganie po wykresie = przybliżenie (drag-to-zoom) + „Reset", hover z celownikiem i tooltipem.
+  - **📉 Odpływ ofert** — dzienna liczba ogłoszeń znikających z rynku + wygładzona średnia 7-dniowa; statystyki Śr./dzień, Rekord, Suma w oknie.
+- Źródło danych: `data/dashboard_data.json` (GitHub Raw, cache-bust `?t=`). Linia trendu z `daily_counts[].{date,count}`; odpływ liczony z `archived_listings[].archived_date` (dzień archiwizacji). Obsługa wielu profili przez selektor (`is_category` → sort/prefix), gotowa na przyszłe źródła.
+- `docs/index.html`: dodany przycisk „Trend" w topbarze (klasa `.btn-trend`) prowadzący do `trend.html`; strona trendu ma przycisk powrotu „Dashboard".
+
 ## [1.5.3] — 2026-06-16
 
 ### 🛡️ Guard: Wykrywanie niepełnego scanu (masowy „missing") + ekspozycja w API
