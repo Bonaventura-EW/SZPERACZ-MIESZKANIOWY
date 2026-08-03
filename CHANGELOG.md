@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.6.2] — 2026-08-03
+
+### 🐛 Fix: Zbyt ostre blokowanie zakresu 3M na wykresie trendu
+- Próg blokowania z 1.6.1 (`spanDays <= d`) wyłączał zakres 3M mimo ~3 miesięcy danych (historia trendu = 90 dni, dokładnie równe oknu 3M), więc działał tylko 1M.
+- `docs/trend.html`: zmiana progu na ostry (`spanDays < d`) — preset jest blokowany dopiero, gdy dane NIE sięgają tak daleko wstecz. Efekt: wykres trendu (90 dni) ma aktywne **1M i 3M** (6M/1R wyszarzone); wykres „Odpływ ofert" (dane z `archived_listings` sięgają tylko 2026-07-18, ~14 dni) ma nadal wyłączone presety poza „Całość". Zakresy odblokowują się wraz z narastaniem historii.
+
 ## [1.6.1] — 2026-08-03
 
 ### 🐛 Fix: Przyciski zakresu na wykresie „Odpływ ofert" wyglądały na zepsute

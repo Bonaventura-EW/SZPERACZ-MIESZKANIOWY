@@ -326,7 +326,7 @@ function buildUI(){
 function updateRangeAvailability(groupId, spanDays){
   document.querySelectorAll(`#${groupId} .range-tab`).forEach(btn=>{
     const d = parseInt(btn.dataset.days, 10);
-    const tooWide = d > 0 && spanDays <= d;   // okno objęłoby całość danych
+    const tooWide = d > 0 && spanDays < d;   // brak danych sięgających tak daleko wstecz
     btn.disabled = tooWide;
     btn.title = tooWide ? 'Za mało danych w tym zakresie' : '';
     // jeśli aktywny zakres stał się niedostępny → wróć na „Całość"
@@ -355,7 +355,7 @@ function render(){
   const prof=PROFILES[currentProfile], all=prof.points;
   const spanDays=(all[all.length-1][0]-all[0][0])/DAY_MS;
   updateRangeAvailability('rangeTabs', spanDays);
-  if(currentDays>0 && spanDays<=currentDays) currentDays=0;
+  if(currentDays>0 && spanDays<currentDays) currentDays=0;
   let pts;
   if(zoomRange){ pts=all.filter(p=>p[0]>=zoomRange[0]&&p[0]<=zoomRange[1]); if(pts.length<2) pts=all; }
   else if(currentDays>0){ const cutoff=all[all.length-1][0]-currentDays*86400000; pts=all.filter(p=>p[0]>=cutoff); if(pts.length<2) pts=all; }
@@ -429,7 +429,7 @@ function renderOutflow(){
   const lastTs=prof.points[prof.points.length-1][0]; let winMin,winMax;
   const spanDays=(lastTs-series[0][0])/DAY_MS;
   updateRangeAvailability('outRangeTabs', spanDays);
-  if(outDays>0 && spanDays<=outDays) outDays=0;
+  if(outDays>0 && spanDays<outDays) outDays=0;
   if(outDays>0){ winMax=lastTs; winMin=lastTs-outDays*DAY_MS; } else { winMin=series[0][0]; winMax=Math.max(lastTs,series[series.length-1][0]); }
   let pts=series.filter(p=>p[0]>=winMin&&p[0]<=winMax); if(pts.length<1) pts=series; viewOut=pts;
   const total=pts.reduce((s,p)=>s+p[1],0), rate=pts.length?total/pts.length:0; let maxP=pts[0]; for(const p of pts) if(p[1]>maxP[1]) maxP=p;
