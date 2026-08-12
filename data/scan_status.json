@@ -1,12 +1,12 @@
 {
   "status": "anomaly_detected",
-  "timestamp": "2026-08-12T15:36:56Z",
-  "timestamp_local": "2026-08-12 15:36:56",
-  "duration_seconds": 95,
+  "timestamp": "2026-08-12T17:33:12Z",
+  "timestamp_local": "2026-08-12 17:33:12",
+  "duration_seconds": 97,
   "listings_total": 0,
   "listings_new": null,
   "listings_removed": null,
-  "scan_number": 116,
+  "scan_number": 117,
   "profiles": [
     {
       "key": "mieszkania_lublin",
@@ -17,12 +17,12 @@
       "crosscheck": "anomaly_detected",
       "anomaly_reasons": [
         "count=0 (puste wyniki)",
-        "duration=0.1s < 30s (zbyt szybko)"
+        "duration=0.3s < 30s (zbyt szybko)"
       ],
       "previous_good_count": 756
     }
   ],
   "error": "Scan odrzucony przez mechanizm anomalii (sanity check) — dane NIE zostały zaktualizowane",
-  "error_detail": "[mieszkania_lublin] count=0 (puste wyniki) | duration=0.1s < 30s (zbyt szybko)",
+  "error_detail": "[mieszkania_lublin] count=0 (puste wyniki) | duration=0.3s < 30s (zbyt szybko)",
   "warning": null
 }
