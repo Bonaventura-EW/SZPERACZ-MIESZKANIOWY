@@ -1,4 +1,9 @@
 requests>=2.31.0
+# curl_cffi: impersonacja TLS/JA3 przeglądarki (impersonate="chrome") — omija blokady
+# WAF oparte na fingerprincie TLS pythonowego requests. Precompiled wheels (manylinux),
+# więc instaluje się w GitHub Actions bez zależności systemowych. requests zostaje jako
+# fallback (patrz get_session() w scraper.py).
+curl_cffi>=0.7.0
 beautifulsoup4>=4.12.0
 openpyxl>=3.1.0
 lxml>=5.0.0

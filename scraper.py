@@ -5,6 +5,16 @@ Scrape'uje kategorie, śledzi ceny/promo/odświeżenia/reaktywacje, generuje JSO
 """
 
 import requests
+# curl_cffi — impersonacja TLS/JA3 prawdziwego Chrome'a. WAF-y OLX potrafią blokować
+# po fingerprincie TLS (charakterystyczny dla pythonowego `requests`), mimo poprawnych
+# nagłówków. curl_cffi z impersonate="chrome" podszywa się pod TLS przeglądarki.
+# Fallback do `requests`, gdy biblioteka niedostępna (np. lokalnie bez instalacji).
+try:
+    from curl_cffi import requests as cffi_requests
+    _HAS_CURL_CFFI = True
+except ImportError:
+    cffi_requests = None
+    _HAS_CURL_CFFI = False
 from bs4 import BeautifulSoup
 import json
 import os
@@ -48,7 +58,36 @@ USER_AGENTS = [
 
 # ─── HTTP Session ────────────────────────────────────────────────────────────
 
+# Profil TLS/JA3, pod który podszywa się curl_cffi. "chrome" mapuje na aktualną
+# wersję Chrome. Impersonate ustawia SPÓJNY User-Agent + sec-ch-ua + kolejność
+# nagłówków pasujące do TLS — dlatego przy curl_cffi NIE nadpisujemy User-Agent
+# losową wartością z USER_AGENTS (Chrome-TLS + obcy UA byłby bardziej podejrzany
+# niż samo `requests`).
+IMPERSONATE_TARGET = "chrome"
+
+# Wspólny zestaw wyjątków sieciowych dla obu backendów (curl_cffi + requests).
+if _HAS_CURL_CFFI:
+    try:
+        from curl_cffi.requests.exceptions import RequestException as _CffiError
+    except ImportError:  # starsze wersje curl_cffi
+        from curl_cffi.requests.errors import RequestsError as _CffiError
+    NETWORK_ERRORS = (requests.RequestException, _CffiError)
+else:
+    NETWORK_ERRORS = (requests.RequestException,)
+
+
 def get_session():
+    # ── Preferowane: curl_cffi z impersonacją TLS Chrome ──
+    if _HAS_CURL_CFFI:
+        s = cffi_requests.Session(impersonate=IMPERSONATE_TARGET)
+        # impersonate dostarcza już User-Agent i nagłówki sec-*; dokładamy tylko
+        # język (OLX = rynek PL) — reszty nie ruszamy, by nie rozjechać fingerprintu.
+        s.headers.update({
+            "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
+        })
+        return s
+
+    # ── Fallback: requests (gdy curl_cffi niedostępny) ──
     from requests.adapters import HTTPAdapter
     from urllib3.util.retry import Retry
     s = requests.Session()
@@ -377,7 +416,7 @@ def scrape_profile(profile_key, profile_config, session):
         try:
             resp = session.get(url, timeout=30)
             resp.raise_for_status()
-        except requests.RequestException as e:
+        except NETWORK_ERRORS as e:
             log.error(f"  [{profile_key}] HTTP error page {page}: {e}")
             break
         soup = BeautifulSoup(resp.text, "lxml")
@@ -458,7 +497,8 @@ def _check_sanity(profile_key, result, duration_s, previous_count):
     return (len(reasons) == 0, reasons)
 
 def scrape_with_crosscheck(profile_key, profile_config):
-    log.info(f"[SCAN] Crosscheck: {profile_key}")
+    backend = f"curl_cffi (impersonate={IMPERSONATE_TARGET})" if _HAS_CURL_CFFI else "requests (fallback)"
+    log.info(f"[SCAN] Crosscheck: {profile_key} | HTTP backend: {backend}")
     prev_count = _previous_good_count(profile_key)
     log.info(f"  [{profile_key}] Poprzedni udany count: {prev_count}")
 

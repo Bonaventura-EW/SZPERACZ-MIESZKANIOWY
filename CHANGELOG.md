@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [1.7.0] — 2026-08-12
+
+### 🛡️ Guard: Impersonacja TLS (curl_cffi) — obejście blokad WAF po fingerprincie JA3
+- Scany #115–#117 (2026-08-12) zwracały `count=0` w ~0,3 s i były odrzucane przez sanity check (`anomaly_detected`) — klasyczny objaw blokady OLX. Nagłówki HTTP były poprawne, więc najprawdopodobniejsza przyczyna to blokada po **fingerprincie TLS/JA3** pythonowego `requests`.
+- `scraper.py`: `get_session()` używa teraz **`curl_cffi`** z `impersonate="chrome"`, podszywając się pod TLS prawdziwego Chrome'a. `requests` pozostaje jako automatyczny fallback (gdy `curl_cffi` niedostępny — `_HAS_CURL_CFFI`). Przy impersonacji NIE nadpisujemy `User-Agent` (impersonate dostarcza spójny UA + nagłówki `sec-*` pasujące do TLS; obcy UA rozjechałby fingerprint).
+- Wspólny zestaw wyjątków `NETWORK_ERRORS` obsługuje oba backendy; log `[SCAN]` pokazuje aktywny backend HTTP (weryfikacja w logach Actions).
+- `requirements.txt`: dodano `curl_cffi>=0.7.0` (precompiled wheels — instaluje się w Actions bez zależności systemowych).
+- Sanity checks pozostają siatką bezpieczeństwa: jeśli impersonacja nie pomoże, dane nadal nie zostaną nadpisane. Skuteczność do zweryfikowania na kolejnym scanie w GitHub Actions (blokada mogła być też IP-based / JS-challenge — wtedy potrzebne proxy residential lub headless Chromium).
+
 ## [1.6.3] — 2026-08-03
 
 ### 🛡️ Guard: Archiwum ofert zachowywane w całości i ciągle (bez cap 500)

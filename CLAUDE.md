@@ -76,6 +76,12 @@ main.py → scraper.run_scan() → OLX (HTTP + BeautifulSoup)
 **Nagłówki HTTP — KRYTYCZNE:**
 Nie dodawaj: `Accept-Encoding: gzip` (solo), `DNT`, `Cache-Control`, `Referer` — triggerują bot detection lub strip response.
 
+**Warstwa HTTP — impersonacja TLS (`get_session()`):**
+- Domyślnie `curl_cffi` z `impersonate="chrome"` — podszywa się pod fingerprint TLS/JA3 prawdziwego Chrome'a (obchodzi blokady WAF, które reagują na pythonowy TLS `requests` mimo poprawnych nagłówków).
+- `requests` = automatyczny fallback (gdy `curl_cffi` niedostępny, flaga `_HAS_CURL_CFFI`).
+- Przy `impersonate` NIE nadpisuj `User-Agent` — biblioteka dostarcza spójny UA + nagłówki `sec-*` pasujące do TLS. Chrome-TLS + obcy UA = bardziej podejrzane niż samo `requests`.
+- Łap błędy sieciowe przez `NETWORK_ERRORS` (tuple obejmujący oba backendy), nie `requests.RequestException`.
+
 ### data/dashboard_data.json — struktura stanu
 
 ```json
