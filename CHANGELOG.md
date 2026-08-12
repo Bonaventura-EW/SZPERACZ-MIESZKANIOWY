@@ -4,6 +4,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
 ## [1.7.0] — 2026-08-12
 
+### 📊 Feature: Banner błędu na dashboardzie (czyta scan_status.json)
+- Dashboard (`docs/index.html`) dotąd ładował wyłącznie `dashboard_data.json`, więc gdy scan był odrzucony przez sanity check (`anomaly_detected`), użytkownik nie widział żadnego komunikatu — dane wyglądały na aktualne, mimo że pochodziły z ostatniego udanego scanu.
+- Dodano baner ostrzegawczy: `loadScanStatus()` pobiera `data/scan_status.json` (endpoint API) i przy statusie `anomaly_detected` / `error` pokazuje czerwony baner „Ostatni scan (…) odrzucony — dane mogą być nieaktualne" wraz z powodem (`error` lub `anomaly_reasons`). Status `partial_anomaly` = baner bursztynowy (ostrzeżenie). Przy `success` baner jest ukryty.
+- Zero nowych zależności (czysty fetch + DOM), spójne z resztą dashboardu.
+
 ### 🛡️ Guard: Impersonacja TLS (curl_cffi) — obejście blokad WAF po fingerprincie JA3
 - Scany #115–#117 (2026-08-12) zwracały `count=0` w ~0,3 s i były odrzucane przez sanity check (`anomaly_detected`) — klasyczny objaw blokady OLX. Nagłówki HTTP były poprawne, więc najprawdopodobniejsza przyczyna to blokada po **fingerprincie TLS/JA3** pythonowego `requests`.
 - `scraper.py`: `get_session()` używa teraz **`curl_cffi`** z `impersonate="chrome"`, podszywając się pod TLS prawdziwego Chrome'a. `requests` pozostaje jako automatyczny fallback (gdy `curl_cffi` niedostępny — `_HAS_CURL_CFFI`). Przy impersonacji NIE nadpisujemy `User-Agent` (impersonate dostarcza spójny UA + nagłówki `sec-*` pasujące do TLS; obcy UA rozjechałby fingerprint).

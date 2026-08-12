@@ -84,6 +84,16 @@ body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-
 .live-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;box-shadow:0 0 6px var(--accent);}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
 
+/* ─── Scan alert (banner błędu/anomalii z scan_status.json) ─── */
+.scan-alert{display:none;max-width:1300px;margin:16px auto 0;padding:14px 20px;border-radius:var(--radius-sm);font-family:var(--font-display);border:1px solid var(--red);background:rgba(220,53,69,0.08);}
+.scan-alert.visible{display:flex;align-items:flex-start;gap:12px;}
+.scan-alert.warn{border-color:#d98c00;background:rgba(217,140,0,0.10);}
+.scan-alert .sa-icon{font-size:20px;line-height:1.3;flex-shrink:0;}
+.scan-alert .sa-body{display:flex;flex-direction:column;gap:3px;}
+.scan-alert .sa-title{font-size:13px;font-weight:700;color:var(--text-primary);}
+.scan-alert .sa-detail{font-size:12px;color:var(--text-secondary);}
+@media(max-width:768px){.scan-alert{margin:12px 10px 0;padding:12px 14px;}}
+
 /* ─── Container ─── */
 .container{max-width:1300px;margin:0 auto;padding:28px;}
 
@@ -362,6 +372,14 @@ input[type=range].day-slider::-moz-range-thumb{
   </div>
 </div>
 
+<div class="scan-alert" id="scanAlert">
+  <div class="sa-icon" id="saIcon">⚠️</div>
+  <div class="sa-body">
+    <div class="sa-title" id="saTitle"></div>
+    <div class="sa-detail" id="saDetail"></div>
+  </div>
+</div>
+
 <main class="container">
 
   <div id="heroCard" class="hero-card" onclick="toggleDetail()">
@@ -493,6 +511,7 @@ input[type=range].day-slider::-moz-range-thumb{
 const GITHUB_OWNER = 'Bonaventura-EW';
 const GITHUB_REPO  = 'SZPERACZ-MIESZKANIOWY';
 const DATA_URL     = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/data/dashboard_data.json`;
+const STATUS_URL   = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/data/scan_status.json`;
 
 let dashData      = null;
 let detailOpen    = false;
@@ -512,6 +531,7 @@ async function loadData() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     dashData = await resp.json();
     renderAll();
+    loadScanStatus();
   } catch(e) {
     console.error('Failed to load data:', e);
     document.getElementById('heroCard').innerHTML = `
@@ -522,6 +542,42 @@ async function loadData() {
         <div class="hero-url">olx.pl/nieruchomosci/mieszkania/wynajem/lublin/</div>
       </div>`;
   }
+}
+
+// ─── Scan status (banner błędu/anomalii) ──────────────────
+async function loadScanStatus() {
+  try {
+    const resp = await fetch(STATUS_URL + `?t=${Date.now()}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    renderScanAlert(await resp.json());
+  } catch(e) {
+    console.warn('Nie udało się wczytać scan_status.json:', e);
+  }
+}
+
+function renderScanAlert(st) {
+  const el = document.getElementById('scanAlert');
+  if (!el || !st) return;
+  const status = st.status || '';
+  // Stany OK — banner ukryty.
+  if (status === 'success' || status === '') {
+    el.className = 'scan-alert';
+    return;
+  }
+  const when = st.timestamp_local || st.timestamp || '';
+  // Szczegóły: preferuj error, w razie braku — powody anomalii z profili.
+  let detail = st.error || '';
+  if (!detail && Array.isArray(st.profiles)) {
+    const reasons = st.profiles.flatMap(p => p.anomaly_reasons || []);
+    if (reasons.length) detail = reasons.join(' • ');
+  }
+  const isPartial = status === 'partial_anomaly';
+  document.getElementById('saIcon').textContent = isPartial ? '⚠️' : '🛑';
+  document.getElementById('saTitle').textContent = isPartial
+    ? `Ostatni scan (${when}) częściowo odrzucony — część danych może być nieaktualna.`
+    : `Ostatni scan (${when}) odrzucony — dane NIE zostały zaktualizowane i mogą być nieaktualne.`;
+  document.getElementById('saDetail').textContent = detail || 'Mechanizm sanity check wykrył anomalię.';
+  el.className = `scan-alert visible ${isPartial ? 'warn' : ''}`;
 }
 
 function renderAll() {
