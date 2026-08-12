@@ -69895,16 +69895,6 @@
   },
   "scan_history": [
     {
-      "timestamp": "2026-05-23 09:06:31",
-      "date": "2026-05-23",
-      "profiles": {
-        "mieszkania_lublin": {
-          "count": 586,
-          "crosscheck": "passed"
-        }
-      }
-    },
-    {
       "timestamp": "2026-05-24 09:24:02",
       "date": "2026-05-24",
       "profiles": {
@@ -70804,7 +70794,21 @@
           "crosscheck": "passed"
         }
       }
+    },
+    {
+      "timestamp": "2026-08-12 08:22:52",
+      "date": "2026-08-12",
+      "profiles": {
+        "mieszkania_lublin": {
+          "count": 0,
+          "crosscheck": "anomaly_detected",
+          "anomaly_reasons": [
+            "count=0 (puste wyniki)",
+            "duration=0.5s < 30s (zbyt szybko)"
+          ]
+        }
+      }
     }
   ],
-  "last_scan": "2026-08-11 08:12:09"
+  "last_scan": "2026-08-12 08:22:52"
 }
