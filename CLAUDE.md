@@ -81,6 +81,7 @@ Nie dodawaj: `Accept-Encoding: gzip` (solo), `DNT`, `Cache-Control`, `Referer` �
 - `requests` = automatyczny fallback (gdy `curl_cffi` niedostępny, flaga `_HAS_CURL_CFFI`).
 - Przy `impersonate` NIE nadpisuj `User-Agent` — biblioteka dostarcza spójny UA + nagłówki `sec-*` pasujące do TLS. Chrome-TLS + obcy UA = bardziej podejrzane niż samo `requests`.
 - Łap błędy sieciowe przez `NETWORK_ERRORS` (tuple obejmujący oba backendy), nie `requests.RequestException`.
+- Retry + rotacja (`_http_get()` w `scrape_profile()`): 429/5xx i błędy transportu są ponawiane z backoffem wykładniczym; przy 403 profil impersonacji jest rotowany z `IMPERSONATE_PROFILES` (`_available_impersonate_profiles()` filtruje do wspieranych przez zainstalowany `curl_cffi`). 404/410 przechodzą bez ponawiania. Gdy padną wszystkie profile/próby → wyjątek HTTP (403 nie jest cichy), a sanity check łapie anomalię.
 
 ### data/dashboard_data.json — struktura stanu
 

@@ -65,6 +65,37 @@ USER_AGENTS = [
 # niż samo `requests`).
 IMPERSONATE_TARGET = "chrome"
 
+# Lista profili impersonacji do ROTACJI przy blokadzie 403. OLX/CloudFront
+# potrafi zablokować konkretny odcisk JA3 — brat zmierzył (ten sam IP), że
+# `requests` dostaje 403 na każdy request, a `curl_cffi` z impersonacją 200;
+# gdyby padł akurat odcisk "chrome", jeden stały profil zostawia nas bez
+# fallbacku. Zaczynamy od IMPERSONATE_TARGET, a przy 403 rotujemy na kolejny.
+# Używamy stabilnych aliasów (a nie nazw wersjonowanych jak "chrome131"), bo te
+# ostatnie znikają między wydaniami curl_cffi — i tak filtrujemy listę do
+# profili faktycznie wspieranych przez zainstalowaną wersję (patrz niżej).
+IMPERSONATE_PROFILES = [IMPERSONATE_TARGET, "safari", "firefox", "edge"]
+
+# Ponawianie żądań (curl_cffi nie ma HTTPAdapter/Retry z urllib3 — musimy sami).
+HTTP_MAX_RETRIES  = 3   # ponowienia na 429/5xx + błędy transportu (poza pierwszą próbą)
+HTTP_BACKOFF_BASE = 2   # sekundy; backoff = BASE * 2**(numer_próby)
+
+
+def _available_impersonate_profiles():
+    """IMPERSONATE_PROFILES ograniczone do nazw wspieranych przez zainstalowaną
+    wersję curl_cffi (nazwy profili są wersjonowane i bywają usuwane). Zawsze
+    zwraca co najmniej [IMPERSONATE_TARGET]; [] gdy curl_cffi niedostępny."""
+    if not _HAS_CURL_CFFI:
+        return []
+    try:
+        import typing
+        from curl_cffi.requests.impersonate import BrowserTypeLiteral
+        supported = set(typing.get_args(BrowserTypeLiteral))
+    except Exception:
+        # Starsza wersja bez literału — nie filtrujemy, ufamy aliasom.
+        return list(IMPERSONATE_PROFILES)
+    avail = [p for p in IMPERSONATE_PROFILES if p in supported]
+    return avail or [IMPERSONATE_TARGET]
+
 # Wspólny zestaw wyjątków sieciowych dla obu backendów (curl_cffi + requests).
 if _HAS_CURL_CFFI:
     try:
@@ -76,10 +107,10 @@ else:
     NETWORK_ERRORS = (requests.RequestException,)
 
 
-def get_session():
+def get_session(impersonate=None):
     # ── Preferowane: curl_cffi z impersonacją TLS Chrome ──
     if _HAS_CURL_CFFI:
-        s = cffi_requests.Session(impersonate=IMPERSONATE_TARGET)
+        s = cffi_requests.Session(impersonate=impersonate or IMPERSONATE_TARGET)
         # impersonate dostarcza już User-Agent i nagłówki sec-*; dokładamy tylko
         # język (OLX = rynek PL) — reszty nie ruszamy, by nie rozjechać fingerprintu.
         s.headers.update({
@@ -403,6 +434,56 @@ def get_next_page_url(soup, current_url):
 
 # ─── Scraping + Crosscheck ───────────────────────────────────────────────────
 
+def _http_get(session, url, timeout, profiles, profile_idx):
+    """GET z ponawianiem (429/5xx + błędy transportu, backoff wykładniczy) i
+    ROTACJĄ profilu impersonacji przy 403 (prawdopodobna blokada odcisku TLS —
+    ponawianie tym samym odciskiem nie ma sensu, więc budujemy sesję z kolejnym
+    profilem). Statusy 4xx inne niż 403 (np. 404/410) przechodzą bez ponawiania.
+
+    Zwraca (resp, session, profile_idx) — session i profile_idx mogą się zmienić
+    po rotacji, więc caller musi ich użyć do kolejnych żądań. Gdy wszystkie
+    profile/próby padną, podnosi ostatni wyjątek sieciowy (NETWORK_ERRORS) —
+    dzięki temu 403 nie jest już cichy, tylko przerywa scan jak każdy błąd HTTP."""
+    last_exc = None
+    resp = None
+    attempt = 0
+    while attempt <= HTTP_MAX_RETRIES:
+        try:
+            resp = session.get(url, timeout=timeout)
+        except NETWORK_ERRORS as e:
+            last_exc = e
+            wait = HTTP_BACKOFF_BASE * (2 ** attempt)
+            log.warning(f"  HTTP transport error ({e}) — retry za {wait}s (próba {attempt+1}/{HTTP_MAX_RETRIES})")
+            time.sleep(wait)
+            attempt += 1
+            continue
+        status = resp.status_code
+        # 403 → rotacja profilu impersonacji (nie ponawiamy tym samym odciskiem TLS)
+        if status == 403 and profiles and profile_idx + 1 < len(profiles):
+            new_target = profiles[profile_idx + 1]
+            log.warning(f"  HTTP 403 — rotacja profilu impersonacji {profiles[profile_idx]!r} → {new_target!r}")
+            session = get_session(impersonate=new_target)
+            profile_idx += 1
+            attempt = 0          # nowy profil = świeża pula prób
+            last_exc = None
+            continue
+        # 429/5xx → przejściowe, backoff i retry tym samym profilem
+        if status == 429 or 500 <= status < 600:
+            if attempt < HTTP_MAX_RETRIES:
+                wait = HTTP_BACKOFF_BASE * (2 ** attempt)
+                log.warning(f"  HTTP {status} — retry za {wait}s (próba {attempt+1}/{HTTP_MAX_RETRIES})")
+                time.sleep(wait)
+                attempt += 1
+                continue
+            break               # wyczerpano próby — niżej podnosimy HTTPError
+        return resp, session, profile_idx
+    # Wyczerpano próby: podnieś ostatni błąd transportu albo HTTPError z odpowiedzi.
+    if last_exc is not None:
+        raise last_exc
+    resp.raise_for_status()
+    return resp, session, profile_idx
+
+
 def scrape_profile(profile_key, profile_config, session):
     url = profile_config["url"]
     all_listings = []
@@ -410,11 +491,13 @@ def scrape_profile(profile_key, profile_config, session):
     page = 1
     max_pages = 50
     prev_page_ids = set()  # ochrona: jeśli kolejna strona zwraca te same ID — koniec
+    profiles = _available_impersonate_profiles()
+    profile_idx = 0
 
     while url and page <= max_pages:
         log.info(f"  [{profile_key}] Page {page}: {url}")
         try:
-            resp = session.get(url, timeout=30)
+            resp, session, profile_idx = _http_get(session, url, 30, profiles, profile_idx)
             resp.raise_for_status()
         except NETWORK_ERRORS as e:
             log.error(f"  [{profile_key}] HTTP error page {page}: {e}")
