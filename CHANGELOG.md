@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
+## [Unreleased]
+
+### 🛡️ Guard: Retry (429/5xx) + rotacja profilu impersonacji TLS przy 403
+- `scraper.py`: warstwa `curl_cffi` (preferowana ścieżka HTTP) nie miała **żadnego** ponawiania — tylko fallback `requests` miał `Retry`/`HTTPAdapter`. Jeśli OLX/CloudFront zablokowałby akurat odcisk `impersonate="chrome"` (dokładnie taka awaria dotknęła repo-brata: 403 na każdy request jednego profilu, 200 na inny), zostawaliśmy bez fallbacku, a 403 był połykany cicho jako pusta strona.
+- Nowy `IMPERSONATE_PROFILES = [IMPERSONATE_TARGET, "safari", "firefox", "edge"]` (stabilne aliasy zamiast nazw wersjonowanych, które znikają między wydaniami `curl_cffi`) + `_available_impersonate_profiles()` filtruje listę do profili wspieranych przez zainstalowaną wersję biblioteki.
+- Nowy helper `_http_get()` w `scrape_profile()`: ponawia **429/5xx** i błędy transportu z backoffem wykładniczym (`HTTP_MAX_RETRIES=3`, `HTTP_BACKOFF_BASE=2`), a przy **403** ROTUJE profil impersonacji (buduje sesję kolejnym profilem — ponawianie tym samym odciskiem TLS nie ma sensu). Statusy 4xx inne niż 403 (404/410) przechodzą bez ponawiania. Gdy padną wszystkie profile/próby — podnosi wyjątek HTTP (403 przestaje być cichy) i istniejący sanity check łapie anomalię jak dotąd.
+- `get_session(impersonate=None)` przyjmuje teraz opcjonalny profil (domyślnie `IMPERSONATE_TARGET` — zachowanie wsteczne).
+- Propagacja z repo-brata `Bonaventura-EW/SZPERACZ` (manifest `2026-08-24-olx-tls-impersonation`, issue #2). Wdrożone w okrojonej formie: bez skryptu diagnostycznego i workflowu (`never_touch: .github/workflows/**`) oraz bez alertu `profile_empty` (redundantny z `SANITY_MIN_COUNT`). Bez nowych zależności.
+
 ## [1.7.0] — 2026-08-12
 
 ### 📊 Feature: Banner błędu na dashboardzie (czyta scan_status.json)
