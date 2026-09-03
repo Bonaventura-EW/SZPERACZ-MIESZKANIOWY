@@ -22,6 +22,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 - Scan #142 zaraportował `header=None`, przez co crosscheck przeszedł bezrefleksyjnie (`header is None` → PASS). Wzorzec `Znaleźliśmy\s+\d+` nie dopasowuje „Znaleźliśmy 1 234 ogłoszeń" — a OLX formatuje liczby ze spacją (także niełamliwą).
 - `get_total_count_from_header()` akceptuje teraz spacje/`\u00a0`/`\u202f` w liczbie i normalizuje ją do `int`.
 
+### 🛡️ Guard: Budżet czasu weryfikacji, diagnostyka nagłówka, uczciwy `active_change`
+- **Budżet czasu** `VERIFY_TIME_BUDGET_S = 120`: gdyby OLX zaczął zwlekać z odpowiedziami, 143 oferty × timeout ÷ liczba wątków rozciągnęłyby scan na kilkanaście minut. Po przekroczeniu budżetu reszta ofert dostaje `unknown` — czyli ścieżkę 2-scan, nigdy fałszywy werdykt.
+- **Diagnostyka nagłówka**: scan #144 nadal zwracał `header_count=null` mimo poprawionego wzorca, a `header is None` to dla crosschecka ciche PASS. Gdy licznika nie da się sparsować, log pokazuje teraz faktyczny tekst OLX zawierający „ogłosze" (`[HEADER?]`) — następny przebieg powie, czy zmieniło się brzmienie, czy nagłówka po prostu nie ma na posortowanej liście.
+- **`active_change` liczony tylko wobec porównywalnej podstawy**: pierwszy wpis z nową metryką porównywał `active_count` (896) z gołym `count` z dnia poprzedniego (797) i pokazywał +99, choć realna zmiana sweepu to +36. Teraz przy braku `active_count` w poprzednim wpisie pole jest `null`, a front spada na `change`.
+
 ### ⚙️ Workflow: Równoległa paginacja i stabilne sortowanie — mniej ofert gubionych w sweepie
 - **Problem.** Sweep szedł strona po stronie z przerwami 1,5–3 s (~2 min na 16 stron), po liście sortowanej domyślną „trafnością", którą OLX przetasowuje między żądaniami (rotacja wyróżnionych). Przy paginacji offsetowej każde przesunięcie listy w górę wypycha pierwszą ofertę strony N+1 na stronę N — już pobraną — i oferta ginie. To główne źródło chronicznego zaniżenia.
 - `build_start_url()` wymusza **stabilne sortowanie** `search[order]=created_at:desc` (profil może się wypisać przez `"stable_sort": False`). Kolejność zmienia się teraz tylko przy realnych zmianach na rynku, nie przy każdym żądaniu.

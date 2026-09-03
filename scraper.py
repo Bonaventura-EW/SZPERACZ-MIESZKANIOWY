@@ -87,6 +87,10 @@ VERIFY_MAX_ALIVE_DAYS  = 7
 # SPA na KAŻDEJ stronie). Wtedy odrzucamy całą weryfikację i wracamy do ścieżki 2-scan.
 VERIFY_MAX_DEAD_RATIO  = 0.85
 VERIFY_MIN_SAMPLE      = 20   # poniżej tylu sprawdzeń odsetek nic nie znaczy
+# Budżet czasu na całą weryfikację. Gdy OLX zacznie zwlekać z odpowiedziami, 143 oferty
+# × timeout / liczba wątków rozciągnęłyby scan na kilkanaście minut. Po przekroczeniu
+# budżetu reszta ofert dostaje 'unknown' — czyli ścieżkę 2-scan, a nie fałszywy werdykt.
+VERIFY_TIME_BUDGET_S   = 120
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 EXCEL_PATH = os.path.join(DATA_DIR, "szperacz_mieszkaniowy.xlsx")
@@ -442,6 +446,14 @@ def get_total_count_from_header(soup):
             digits = re.sub(r"[^\d]", "", m.group(1))
             if digits:
                 return int(digits)
+    # Nie znaleziono — pokaż, co OLX faktycznie napisał. Bez tego "header=None"
+    # (scan #144) nie mówi, czy zmieniło się brzmienie, czy nagłówka po prostu nie ma,
+    # a crosscheck po cichu przechodzi, bo `header is None` traktujemy jako PASS.
+    for el in soup.find_all(string=re.compile(r"ogłosze")):
+        txt = re.sub(r"\s+", " ", str(el)).strip()
+        if txt:
+            log.info(f"  [HEADER?] nie sparsowano licznika; kandydat: {txt[:120]!r}")
+            break
     return None
 
 def _url_with_params(url, params):
@@ -913,7 +925,11 @@ def verify_listings_alive(profile_key, missing):
     statuses = {}
     samples  = {}
 
+    deadline = time.time() + VERIFY_TIME_BUDGET_S
+
     def _job(listing):
+        if time.time() > deadline:
+            return listing["id"], ("unknown", "przekroczony budżet czasu weryfikacji")
         try:
             return listing["id"], _verify_one_listing(listing["url"], profiles)
         except Exception as e:
@@ -1569,15 +1585,21 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                     today_entry["removed"] = prev_removed + flow_removed
                 if len(dc) >= 2:
                     today_entry["change"] = result["count"] - dc[-2]["count"]
-                    prev_active = dc[-2].get("active_count") or dc[-2]["count"]
-                    today_entry["active_change"] = active_count - prev_active
+                    # Tylko wobec wpisu, który ma tę samą metrykę. Porównanie active_count
+                    # z gołym count sprzed weryfikacji dawało skok będący artefaktem zmiany
+                    # definicji (scan #144: +99 zamiast realnych +36).
+                    prev_active = dc[-2].get("active_count")
+                    today_entry["active_change"] = (active_count - prev_active
+                                                    if prev_active is not None else None)
         else:
             prev_c      = dc[-1]["count"] if dc else None
-            prev_active = (dc[-1].get("active_count") or dc[-1]["count"]) if dc else None
+            prev_active = dc[-1].get("active_count") if dc else None
             ch          = result["count"] - prev_c if prev_c is not None else 0
             entry = {
                 "date": today, "count": result["count"], "change": ch,
-                "active_change": (active_count - prev_active) if prev_active is not None else 0,
+                # None = brak porównywalnej podstawy (poprzedni wpis sprzed weryfikacji);
+                # front spada wtedy na `change`, zamiast pokazywać artefakt zmiany metryki.
+                "active_change": (active_count - prev_active) if prev_active is not None else None,
                 "timestamp": now_str, "median_price": median_price,
                 "promoted_count": promo_count, "promoted_percentage": promo_pct,
                 "price_distribution": price_dist,
