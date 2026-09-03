@@ -10,7 +10,7 @@ how:         (1) Po sweepie oferty z bazy, których w nim nie było, są odpytyw
 surface:     scraper.py, main.py, docs/index.html, docs/trend.html, tests/test_scraper.py, API.md
 generality:  family
 propagate:   yes
-commit:      488fef09c15a0a83eaea9c164bc3f787dfa8a707
+commit:      15ae8e8
 ---
 
 # Kontekst dla brata-ewaluatora
