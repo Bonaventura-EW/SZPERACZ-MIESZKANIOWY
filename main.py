@@ -55,6 +55,7 @@ def save_api(status_data, history_data):
             "date":           entry["timestamp"][:10],
             "timestamp":      entry["timestamp"],
             "total_listings": p.get("listings_total") or entry.get("listings_total"),
+            "active_listings": p.get("listings_active") or entry.get("listings_active"),
             "added":          added,
             "removed":        removed,
         }
@@ -72,6 +73,9 @@ def save_api(status_data, history_data):
     api_data = {
         "last_updated":   status_data["timestamp"],
         "total_listings": total_now,
+        # Oferty uznane za żywe: znalezione w sweepie + potwierdzone bezpośrednio po URL-u.
+        # total_listings zostaje surowym wynikiem sweepu (kompatybilność wstecz).
+        "active_listings": cp.get("listings_active") or status_data.get("listings_active") or total_now,
         "scans":          last_three,
     }
     # Niepełny scan (masowy "missing") — wystawiamy ostrzeżenie w publicznym API.
@@ -96,10 +100,21 @@ def build_profiles_summary(results):
             "key":              pk,
             "label":            flow.get("label", pk),
             "listings_total":   flow.get("listings_total", r.get("count")),
+            # listings_active = oferty uznane za żywe (sweep + potwierdzone po URL-u).
+            # listings_total zostaje "ile znalazł sweep" — semantyka publicznego API bez zmian.
+            "listings_active":  flow.get("listings_active"),
             "listings_new":     flow.get("listings_new"),
             "listings_removed": flow.get("listings_removed"),
             "crosscheck":       flow.get("crosscheck", r.get("crosscheck")),
+            "verified_alive":   flow.get("verified_alive"),
+            "verified_dead":    flow.get("verified_dead"),
+            "verified_unknown": flow.get("verified_unknown"),
+            "pages_scraped":    flow.get("pages_scraped"),
+            "pages_expected":   flow.get("pages_expected"),
+            "header_count":     flow.get("header_count"),
         }
+        if flow.get("verification_skipped"):
+            entry["verification_skipped"] = flow["verification_skipped"]
         # Przy anomalii flow jest pusty (profil pominięty w generate_dashboard_json) —
         # powody odrzucenia siedzą bezpośrednio w wyniku scrapera.
         if r.get("anomaly_reasons"):
@@ -133,6 +148,7 @@ if __name__ == "__main__":
         "timestamp_local":  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "duration_seconds": None,
         "listings_total":   None,
+        "listings_active":  None,
         "listings_new":     None,
         "listings_removed": None,
         "scan_number":      scan_number,
@@ -151,6 +167,7 @@ if __name__ == "__main__":
         profiles  = build_profiles_summary(results)
 
         listings_total   = sum(p["listings_total"]   or 0 for p in profiles)
+        listings_active  = sum(p.get("listings_active") or p["listings_total"] or 0 for p in profiles)
         listings_new     = sum(p["listings_new"]     or 0 for p in profiles if p["listings_new"]     is not None)
         listings_removed = sum(p["listings_removed"] or 0 for p in profiles if p["listings_removed"] is not None)
 
@@ -200,6 +217,7 @@ if __name__ == "__main__":
             "status":           scan_status,
             "duration_seconds": duration,
             "listings_total":   listings_total,
+            "listings_active":  listings_active,
             "listings_new":     listings_new     if has_flow else None,
             "listings_removed": listings_removed if has_flow else None,
             "profiles":         profiles,
@@ -231,6 +249,7 @@ if __name__ == "__main__":
         "status":           status["status"],
         "duration_seconds": status["duration_seconds"],
         "listings_total":   status["listings_total"],
+        "listings_active":  status.get("listings_active"),
         "listings_new":     status["listings_new"],
         "listings_removed": status["listings_removed"],
         "scan_number":      status["scan_number"],
@@ -250,15 +269,22 @@ if __name__ == "__main__":
     # Wynik w logach GitHub Actions
     if status["status"] in ("success", "partial_scan"):
         icon = "✅" if status["status"] == "success" else "⚠️ "
-        print(f"{icon} Scan #{scan_number} OK — {status['listings_total']} ogłoszeń"
+        print(f"{icon} Scan #{scan_number} OK — {status['listings_active']} aktywnych ofert"
+              f" (sweep: {status['listings_total']})"
               f" | nowe: {status['listings_new']} | usunięte: {status['listings_removed']}"
               f" | czas: {status['duration_seconds']}s")
         for p in status.get("profiles", []):
             print(f"   [{p['key']}] {p['label']}: "
-                  f"total={p['listings_total']} "
+                  f"active={p.get('listings_active')} "
+                  f"sweep={p['listings_total']} "
+                  f"stron={p.get('pages_scraped')}/{p.get('pages_expected')} "
+                  f"header={p.get('header_count')} "
+                  f"weryfikacja(żywe/martwe/?)={p.get('verified_alive')}/{p.get('verified_dead')}/{p.get('verified_unknown')} "
                   f"new={p['listings_new']} "
                   f"removed={p['listings_removed']} "
                   f"crosscheck={p['crosscheck']}")
+            if p.get("verification_skipped"):
+                print(f"      weryfikacja pominięta: {p['verification_skipped']}")
         if status.get("warning"):
             print(f"⚠️  OSTRZEŻENIE (niepełny scan): {status['warning']}")
     elif status["status"] in ("anomaly_detected", "partial_anomaly"):

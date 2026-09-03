@@ -22,6 +22,9 @@ import re
 import time
 import random
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 from datetime import datetime, timedelta
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -42,6 +45,42 @@ PROFILES = {
 # odrzucane na etapie parsowania (cicho — bez logów i bez wpływu na crosscheck
 # poza dolnym progiem). Oferty bez ceny (price=None) przepuszczamy.
 MAX_PRICE = 10000
+
+# Maksymalna liczba stron paginacji na profil (zabezpieczenie przed zapętleniem).
+MAX_PAGES = 50
+
+# ── Stabilne sortowanie wyników ──────────────────────────────────────────────
+# Domyślne sortowanie OLX ("trafność") przetasowuje listę między żądaniami:
+# wyróżnione rotują, a kolejność organicznych potrafi się zmienić w trakcie
+# jednego sweepu. Przy paginacji offsetowej każde przesunięcie listy w górę
+# (zniknięcie oferty u góry) wypycha pierwszą ofertę strony N+1 na stronę N,
+# którą już pobraliśmy — i oferta ginie. created_at:desc daje porządek, który
+# zmienia się tylko przy realnych zmianach na rynku.
+STABLE_SORT_PARAM = ("search[order]", "created_at:desc")
+
+# ── Paginacja równoległa ─────────────────────────────────────────────────────
+# Strona 1 leci sekwencyjnie (daje header_count i liczbę stron), reszta równolegle.
+# 4 wątki skracają sweep z ~2 min do ~20 s, czyli tyle samo razy zwężają okno,
+# w którym lista może się pod nami przesunąć. Wyżej nie wchodzimy — seria
+# równoległych żądań to dokładnie ten wzorzec, na który reagują WAF-y.
+PAGE_WORKERS = 4
+PAGE_JITTER  = (0.2, 0.9)   # losowy odstęp przed żądaniem — rozjeżdża start wątków
+
+# ── Weryfikacja "zaginionych" ofert ──────────────────────────────────────────
+# Oferty z bazy, których nie było w sweepie, sprawdzamy bezpośrednio po ich URL-u.
+# To zamiana wnioskowania ("nie ma jej na liście → pewnie zniknęła") na pomiar.
+VERIFY_MISSING_ENABLED = True
+VERIFY_WORKERS         = 4
+VERIFY_TIMEOUT_S       = 20
+VERIFY_JITTER          = (0.2, 0.9)
+# Powyżej tego progu (liczbowo lub jako ułamek bazy — patrz SANITY_MAX_MISSING_RATIO)
+# nie weryfikujemy pojedynczo: tyle ofert naraz nie znika, więc zepsuty jest sweep,
+# a nie oferty. Przy okazji trzyma budżet żądań w ryzach.
+VERIFY_MAX_LISTINGS    = 150
+# Bezpiecznik na wypadek, gdyby detekcja martwej strony przestała działać po
+# zmianie layoutu OLX: oferta utrzymywana przy życiu wyłącznie weryfikacją
+# (niewidziana w żadnym sweepie) i tak trafia do archiwum po tylu dniach.
+VERIFY_MAX_ALIVE_DAYS  = 7
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 EXCEL_PATH = os.path.join(DATA_DIR, "szperacz_mieszkaniowy.xlsx")
@@ -391,50 +430,59 @@ def get_total_count_from_header(soup):
         if m: return int(m.group(1))
     return None
 
-def get_next_page_url(soup, current_url):
-    """
-    Zwraca URL następnej strony.
-    OLX ukrywa `pagination-forward` na ostatnich stronach przed końcem,
-    mimo że dalsze strony nadal istnieją i mają ogłoszenia.
-    Dlatego najpierw próbujemy `pagination-forward`, a jeśli go nie ma —
-    szukamy maksymalnego `page=N` w linkach paginacji.
-    """
-    # 1) Standardowa próba: pagination-forward
-    for sel in ['[data-testid="pagination-forward"]','[data-cy="pagination-forward"]']:
-        pag = soup.select_one(sel)
-        if pag:
-            href = pag.get("href","")
-            if href:
-                return href if href.startswith("http") else f"https://www.olx.pl{href}"
+def _url_with_params(url, params):
+    """Zwraca URL z podmienionymi parametrami query (wartość None = usuń parametr).
+    Sklejanie stringami się tu wykłada: URL profilu może już mieć query (sortowanie),
+    a parametr `page` bywa w środku, nie na końcu."""
+    parts = urlparse(url)
+    q = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)]
+    for key, val in params:
+        q = [(k, v) for k, v in q if k != key]
+        if val is not None:
+            q.append((key, val))
+    return urlunparse(parts._replace(query=urlencode(q)))
 
-    # 2) Fallback: szukamy najwyższego page=N w linkach paginacji
-    m_cur = re.search(r'page=(\d+)', current_url)
-    current_page = int(m_cur.group(1)) if m_cur else 1
-    max_page = current_page
-    pag_links = soup.select(
+
+def build_start_url(profile_config):
+    """URL startowy profilu z wymuszonym stabilnym sortowaniem (najnowsze pierwsze).
+    Profil może się wypisać przez `"stable_sort": False`."""
+    url = profile_config["url"]
+    if not profile_config.get("stable_sort", True):
+        return url
+    if STABLE_SORT_PARAM[0] in url or "search%5Border%5D" in url:
+        return url
+    return _url_with_params(url, [STABLE_SORT_PARAM])
+
+
+def page_url(base_url, page):
+    """URL konkretnej strony wyników (strona 1 = bez parametru `page`)."""
+    return _url_with_params(base_url, [("page", str(page) if page > 1 else None)])
+
+
+def get_last_page_number(soup):
+    """Najwyższy numer strony widoczny w paginacji, albo None gdy OLX go nie pokazuje.
+    Znany jest z góry → strony 2..N pobieramy równolegle zamiast iść po `pagination-forward`."""
+    links = soup.select(
         '[data-testid*="pagination"] a[href*="page="], '
         '[data-cy*="pagination"] a[href*="page="]'
     )
-    if not pag_links:
+    if not links:
         wrap = soup.select_one('[data-testid="pagination-wrapper"], [data-cy="pagination-wrapper"]')
         if wrap:
-            pag_links = wrap.select('a[href*="page="]')
-    for a in pag_links:
-        m = re.search(r'page=(\d+)', a.get('href', ''))
+            links = wrap.select('a[href*="page="]')
+    max_page = None
+    for a in links:
+        m = re.search(r"page=(\d+)", a.get("href", ""))
         if m:
             n = int(m.group(1))
-            if n > max_page:
+            if max_page is None or n > max_page:
                 max_page = n
-    if max_page > current_page:
-        # Zbuduj URL do następnej strony, opierając się na bazowym URL bez parametru page
-        base = re.sub(r'[?&]page=\d+', '', current_url)
-        sep = '&' if '?' in base else '?'
-        return f"{base}{sep}page={current_page + 1}"
-    return None
+    return max_page
+
 
 # ─── Scraping + Crosscheck ───────────────────────────────────────────────────
 
-def _http_get(session, url, timeout, profiles, profile_idx):
+def _http_get(session, url, timeout, profiles, profile_idx, max_retries=None):
     """GET z ponawianiem (429/5xx + błędy transportu, backoff wykładniczy) i
     ROTACJĄ profilu impersonacji przy 403 (prawdopodobna blokada odcisku TLS —
     ponawianie tym samym odciskiem nie ma sensu, więc budujemy sesję z kolejnym
@@ -444,16 +492,20 @@ def _http_get(session, url, timeout, profiles, profile_idx):
     po rotacji, więc caller musi ich użyć do kolejnych żądań. Gdy wszystkie
     profile/próby padną, podnosi ostatni wyjątek sieciowy (NETWORK_ERRORS) —
     dzięki temu 403 nie jest już cichy, tylko przerywa scan jak każdy błąd HTTP."""
+    if max_retries is None:
+        max_retries = HTTP_MAX_RETRIES
     last_exc = None
     resp = None
     attempt = 0
-    while attempt <= HTTP_MAX_RETRIES:
+    while attempt <= max_retries:
         try:
             resp = session.get(url, timeout=timeout)
         except NETWORK_ERRORS as e:
             last_exc = e
+            if attempt >= max_retries:
+                break
             wait = HTTP_BACKOFF_BASE * (2 ** attempt)
-            log.warning(f"  HTTP transport error ({e}) — retry za {wait}s (próba {attempt+1}/{HTTP_MAX_RETRIES})")
+            log.warning(f"  HTTP transport error ({e}) — retry za {wait}s (próba {attempt+1}/{max_retries})")
             time.sleep(wait)
             attempt += 1
             continue
@@ -469,9 +521,9 @@ def _http_get(session, url, timeout, profiles, profile_idx):
             continue
         # 429/5xx → przejściowe, backoff i retry tym samym profilem
         if status == 429 or 500 <= status < 600:
-            if attempt < HTTP_MAX_RETRIES:
+            if attempt < max_retries:
                 wait = HTTP_BACKOFF_BASE * (2 ** attempt)
-                log.warning(f"  HTTP {status} — retry za {wait}s (próba {attempt+1}/{HTTP_MAX_RETRIES})")
+                log.warning(f"  HTTP {status} — retry za {wait}s (próba {attempt+1}/{max_retries})")
                 time.sleep(wait)
                 attempt += 1
                 continue
@@ -484,58 +536,138 @@ def _http_get(session, url, timeout, profiles, profile_idx):
     return resp, session, profile_idx
 
 
-def scrape_profile(profile_key, profile_config, session):
-    url = profile_config["url"]
-    all_listings = []
-    header_count = None
-    page = 1
-    max_pages = 50
-    prev_page_ids = set()  # ochrona: jeśli kolejna strona zwraca te same ID — koniec
-    profiles = _available_impersonate_profiles()
-    profile_idx = 0
+# Sesje curl_cffi nie są thread-safe — każdy wątek trzyma własną (wraz z numerem
+# profilu impersonacji, bo _http_get potrafi go zrotować po 403).
+_thread_local = threading.local()
 
-    while url and page <= max_pages:
-        log.info(f"  [{profile_key}] Page {page}: {url}")
+
+def _thread_http_get(url, profiles, timeout=30, max_retries=None):
+    session = getattr(_thread_local, "session", None)
+    idx     = getattr(_thread_local, "profile_idx", 0)
+    if session is None:
+        session = get_session(impersonate=profiles[idx] if profiles else None)
+    resp, session, idx = _http_get(session, url, timeout, profiles, idx, max_retries=max_retries)
+    _thread_local.session     = session
+    _thread_local.profile_idx = idx
+    return resp
+
+
+def _fetch_page_listings(url, profiles):
+    """Pobiera i parsuje jedną stronę wyników (wołane z puli wątków)."""
+    time.sleep(random.uniform(*PAGE_JITTER))
+    resp = _thread_http_get(url, profiles, timeout=30)
+    resp.raise_for_status()
+    return parse_listings_from_soup(BeautifulSoup(resp.text, "lxml"))
+
+
+def scrape_profile(profile_key, profile_config, session):
+    """Pobiera wszystkie strony wyników profilu.
+
+    Strona 1 idzie sekwencyjnie — daje `header_count` i numer ostatniej strony.
+    Strony 2..N lecą RÓWNOLEGLE (PAGE_WORKERS wątków): sweep skraca się z ~2 min
+    do ~20 s, a wraz z nim okno, w którym OLX przesuwa listę pod nami. Gdy
+    paginacja nie zdradza liczby stron, wracamy do trybu sekwencyjnego.
+
+    Zwraca też diagnostykę kompletności (`pages_scraped`, `pages_expected`,
+    `failed_pages`, `empty_pages`) — sanity check odrzuca na jej podstawie sweep
+    ucięty w połowie, zamiast zapisać go jako "mniej ofert na rynku".
+    """
+    start_url   = build_start_url(profile_config)
+    profiles    = _available_impersonate_profiles()
+    profile_idx = 0
+    collected   = {}     # listing_id -> oferta (dedup: pierwsze wystąpienie wygrywa)
+    page_counts = {}     # nr strony -> ile ofert sparsowano
+    failed_pages = []
+
+    def absorb(page_no, listings):
+        page_counts[page_no] = len(listings)
+        added = 0
+        for l in listings:
+            if l["listing_id"] not in collected:
+                collected[l["listing_id"]] = l
+                added += 1
+        return added
+
+    # ── Strona 1: sekwencyjnie (header + rozpoznanie paginacji) ──
+    log.info(f"  [{profile_key}] Page 1: {start_url}")
+    resp, session, profile_idx = _http_get(session, start_url, 30, profiles, profile_idx)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "lxml")
+    header_count = get_total_count_from_header(soup)
+    last_page    = get_last_page_number(soup)
+    absorb(1, parse_listings_from_soup(soup))
+    log.info(f"  [{profile_key}] Page 1: {page_counts[1]} listings | header={header_count} "
+             f"| ostatnia strona wg paginacji={last_page}")
+
+    # ── Strony 2..N: równolegle ──
+    parallel_last = min(last_page or 1, MAX_PAGES)
+    if parallel_last > 1:
+        log.info(f"  [{profile_key}] Pobieram strony 2-{parallel_last} równolegle ({PAGE_WORKERS} wątki)")
+        with ThreadPoolExecutor(max_workers=PAGE_WORKERS) as ex:
+            futures = {n: ex.submit(_fetch_page_listings, page_url(start_url, n), profiles)
+                       for n in range(2, parallel_last + 1)}
+            for n, fut in futures.items():
+                try:
+                    listings = fut.result()
+                except Exception as e:
+                    failed_pages.append(n)
+                    log.error(f"  [{profile_key}] Page {n}: BŁĄD ({type(e).__name__}: {e})")
+                    continue
+                added = absorb(n, listings)
+                log.info(f"  [{profile_key}] Page {n}: {len(listings)} listings (+{added} nowych)")
+
+    # ── Ogon: OLX pokazuje w paginacji tylko okno numerów — dobieramy dalej sekwencyjnie ──
+    page = parallel_last + 1
+    while page <= MAX_PAGES and not failed_pages:
+        url = page_url(start_url, page)
         try:
             resp, session, profile_idx = _http_get(session, url, 30, profiles, profile_idx)
             resp.raise_for_status()
         except NETWORK_ERRORS as e:
-            log.error(f"  [{profile_key}] HTTP error page {page}: {e}")
+            failed_pages.append(page)
+            log.error(f"  [{profile_key}] Page {page} (ogon): BŁĄD ({type(e).__name__}: {e})")
             break
-        soup = BeautifulSoup(resp.text, "lxml")
-        if page == 1:
-            header_count = get_total_count_from_header(soup)
-            log.info(f"  [{profile_key}] Header count: {header_count}")
-        page_listings = parse_listings_from_soup(soup)
-        log.info(f"  [{profile_key}] Page {page}: {len(page_listings)} listings")
-        if not page_listings:
+        listings = parse_listings_from_soup(BeautifulSoup(resp.text, "lxml"))
+        if not listings:
             break
-        # Ochrona przed zapętleniem: jeśli OLX zwraca tę samą stronę (zamiast 404 lub redirect)
-        current_page_ids = {l["listing_id"] for l in page_listings}
-        if prev_page_ids and current_page_ids and current_page_ids.issubset(prev_page_ids):
-            log.info(f"  [{profile_key}] Page {page}: duplikat poprzedniej strony — koniec paginacji")
+        added = absorb(page, listings)
+        log.info(f"  [{profile_key}] Page {page} (ogon): {len(listings)} listings (+{added} nowych)")
+        if added == 0:
+            # Ta sama treść co wcześniej (OLX zwraca ostatnią stronę zamiast 404) — koniec.
             break
-        prev_page_ids = current_page_ids
-        all_listings.extend(page_listings)
-        url = get_next_page_url(soup, url)
         page += 1
-        time.sleep(random.uniform(1.5, 3.0))
+        time.sleep(random.uniform(1.0, 2.0))
 
-    seen = set()
-    unique = []
-    for l in all_listings:
-        if l["listing_id"] not in seen:
-            seen.add(l["listing_id"])
-            unique.append(l)
-    return {"listings": unique, "count": len(unique), "header_count": header_count, "pages_scraped": page-1}
+    # ── Diagnostyka kompletności ──
+    # "Dziura" to pusta strona, PO KTÓREJ są jeszcze strony z ofertami. Pusty ogon
+    # (paginacja zapowiadała stronę, na której realnie nic już nie ma) jest normalny
+    # i nie może wywracać scanu.
+    non_empty      = [n for n, c in page_counts.items() if c > 0]
+    last_non_empty = max(non_empty) if non_empty else 0
+    empty_pages    = sorted(n for n, c in page_counts.items() if c == 0 and n < last_non_empty)
+    unique        = list(collected.values())
+    return {
+        "listings":       unique,
+        "count":          len(unique),
+        "header_count":   header_count,
+        "pages_scraped":  len(page_counts),
+        "pages_expected": last_page,
+        "failed_pages":   sorted(failed_pages),
+        "empty_pages":    empty_pages,
+    }
 
 # ── Sanity checks (zapora przed pustymi / fałszywymi scanami) ──────────────
 # 4 zabezpieczenia chronią przed sytuacją, gdy OLX zwróci CAPTCHA / pustą stronę
 # / błąd po stronie sieci i scan zostanie uznany za udany.
 SANITY_MIN_COUNT       = 50      # poniżej traktujemy jako uszkodzenie (kategoria zwykle 500-700)
 SANITY_MIN_HEADER      = 10      # header_count < 10 to znak, że strona się nie załadowała
-SANITY_MIN_DURATION_S  = 30      # scan poniżej 30s = CAPTCHA-page lub redirect (nie pełna paginacja)
-SANITY_MAX_DROP_RATIO  = 0.40    # spadek > 40% vs ostatni udany scan = czerwona flaga
+# Po zrównolegleniu paginacji pełny sweep trwa ~20s, więc czas przestał być miarą
+# kompletności — tę rolę przejęły liczniki stron (failed_pages / pages_expected).
+# Zostaje niski próg, żeby złapać natychmiastowy redirect na CAPTCHA.
+SANITY_MIN_DURATION_S  = 5
+# Realna dzienna zmiana nigdy nie przekroczyła kilku procent (90 dni historii),
+# a próg 40% przepuszczał niepełne scany: 2026-06-15 zapisał 429 zamiast ~585.
+SANITY_MAX_DROP_RATIO  = 0.20
 SANITY_MAX_MISSING_RATIO = 0.25  # >25% bazy znika w jednym scanie (carried_missing) = niepełny scrape
 COOLDOWN_AFTER_ANOMALY = 90      # sekundy pauzy przed retry po wykryciu anomalii
 
@@ -577,6 +709,23 @@ def _check_sanity(profile_key, result, duration_s, previous_count):
         drop_ratio = (previous_count - count) / previous_count
         if drop_ratio > SANITY_MAX_DROP_RATIO:
             reasons.append(f"spadek {drop_ratio*100:.1f}% vs poprzedni count={previous_count}")
+    # 6) sweep ucięty w połowie — strony, których nie udało się pobrać.
+    #    Wcześniej taki scan przechodził jako pełnoprawny (pętla po prostu robiła
+    #    `break`), a brakujące oferty szły w missing → po dwóch dniach w archiwum.
+    failed = result.get("failed_pages") or []
+    if failed:
+        reasons.append(f"nie pobrano stron: {failed}")
+    # 7) mniej stron niż zapowiadała paginacja
+    expected = result.get("pages_expected")
+    scraped_pages = result.get("pages_scraped")
+    if expected and scraped_pages is not None:
+        expected_capped = min(expected, MAX_PAGES)
+        if scraped_pages < expected_capped:
+            reasons.append(f"pobrano {scraped_pages} z {expected_capped} stron paginacji")
+    # 8) dziura w środku paginacji (strona bez ofert, choć dalsze mają)
+    empty = result.get("empty_pages") or []
+    if empty:
+        reasons.append(f"puste strony w środku paginacji: {empty}")
     return (len(reasons) == 0, reasons)
 
 def scrape_with_crosscheck(profile_key, profile_config):
@@ -591,7 +740,8 @@ def scrape_with_crosscheck(profile_key, profile_config):
     d1 = time.time() - t0
     r1["duration_s"] = round(d1, 1)
     scraped, header = r1["count"], r1["header_count"]
-    log.info(f"  [{profile_key}] Próba 1: count={scraped}, header={header}, duration={d1:.1f}s")
+    log.info(f"  [{profile_key}] Próba 1: count={scraped}, header={header}, duration={d1:.1f}s, "
+             f"stron={r1.get('pages_scraped')}/{r1.get('pages_expected')}")
 
     # Sanity check próby 1
     ok1, reasons1 = _check_sanity(profile_key, r1, d1, prev_count)
@@ -650,6 +800,154 @@ def scrape_with_crosscheck(profile_key, profile_config):
         if c2 > c1:
             r2["crosscheck"] = "no_header_retry"; return r2
     r1["crosscheck"] = "best_of_two"; return r1
+
+# ─── Weryfikacja "zaginionych" ofert ─────────────────────────────────────────
+# Oferta może zniknąć z listingu, choć nadal żyje: sweep łapie ją nierówno przy
+# paginacji offsetowej, a OLX potrafi zwrócić niepełne wyniki. Zamiast wnioskować
+# z nieobecności, pytamy OLX wprost o tę ofertę — jej własnym URL-em.
+
+# Frazy ze stron wygaszonych/usuniętych ogłoszeń. Trzymamy pełne zwroty, nie
+# pojedyncze słowa — "zakończone" czy "wygasło" trafiają się też na żywych stronach.
+DEAD_PAGE_MARKERS = (
+    "to ogłoszenie jest już nieaktualne",
+    "ogłoszenie jest już nieaktualne",
+    "ogłoszenie zostało usunięte",
+    "ogłoszenie nie jest już dostępne",
+    "nie jest już dostępne",
+    "ogłoszenie wygasło",
+    "nie znaleźliśmy tej strony",
+    "strona, której szukasz, nie istnieje",
+    "this ad is no longer available",
+)
+
+# Elementy, które renderuje TYLKO żywa strona oferty.
+ALIVE_PAGE_MARKERS = (
+    'data-testid="ad-price-container"',
+    'data-testid="main-ad-price"',
+    'data-testid="ad_description"',
+    'data-cy="ad_title"',
+    'data-cy="ad_description"',
+    'data-testid="ad-footer-bar-section"',
+)
+
+
+def classify_offer_page(status_code, final_url, html):
+    """Czy strona pojedynczej oferty świadczy o tym, że ogłoszenie żyje?
+
+    Zwraca 'dead' | 'alive' | 'unknown'. Do 'dead' schodzimy WYŁĄCZNIE na
+    jednoznaczny sygnał: pomyłka w tę stronę archiwizuje żywą ofertę, a przy
+    blokadzie WAF (403 na wszystkim) zarchiwizowałaby całą bazę w jednym scanie.
+    Wszystko niepewne to 'unknown' → stara ścieżka 2-scan confirmation.
+    """
+    if status_code in (404, 410):
+        return "dead"
+    if status_code != 200:
+        return "unknown"
+    low = (html or "").lower()
+    if any(m in low for m in DEAD_PAGE_MARKERS):
+        return "dead"
+    if final_url and "/oferta/" not in final_url:
+        # OLX przekierowuje wygaszone oferty na kategorię lub stronę główną.
+        return "dead"
+    if any(m.lower() in low for m in ALIVE_PAGE_MARKERS):
+        return "alive"
+    return "unknown"
+
+
+def _page_title(html):
+    """<title> strony — tylko do logów przy statusie 'unknown'."""
+    m = re.search(r"<title[^>]*>(.*?)</title>", html or "", re.I | re.S)
+    return re.sub(r"\s+", " ", m.group(1)).strip()[:120] if m else ""
+
+
+def _verify_one_listing(url, profiles):
+    """(status, diagnostyka) dla jednej oferty. Błąd sieci → 'unknown'."""
+    time.sleep(random.uniform(*VERIFY_JITTER))
+    try:
+        resp = _thread_http_get(url, profiles, timeout=VERIFY_TIMEOUT_S, max_retries=1)
+    except NETWORK_ERRORS as e:
+        return "unknown", f"{type(e).__name__}: {e}"
+    final_url = str(getattr(resp, "url", "") or url)
+    html      = resp.text or ""
+    status    = classify_offer_page(resp.status_code, final_url, html)
+    detail    = f"HTTP {resp.status_code} | {_page_title(html)}" if status == "unknown" else ""
+    return status, detail
+
+
+def verify_listings_alive(profile_key, missing):
+    """Sprawdza równolegle URL-e ofert nieobecnych w sweepie.
+    Zwraca (mapa id→status, statystyki)."""
+    profiles = _available_impersonate_profiles()
+    statuses = {}
+    unknown_samples = []
+
+    def _job(listing):
+        try:
+            return listing["id"], _verify_one_listing(listing["url"], profiles)
+        except Exception as e:
+            # Weryfikacja jest dodatkiem — jej wywrotka nie może przewrócić scanu.
+            return listing["id"], ("unknown", f"{type(e).__name__}: {e}")
+
+    log.info(f"  [{profile_key}] Weryfikacja {len(missing)} zaginionych ofert po URL "
+             f"({VERIFY_WORKERS} wątki)...")
+    t0 = time.time()
+    with ThreadPoolExecutor(max_workers=VERIFY_WORKERS) as ex:
+        for lid, (status, detail) in ex.map(_job, missing):
+            statuses[lid] = status
+            if status == "unknown" and len(unknown_samples) < 3:
+                unknown_samples.append(f"{lid}: {detail}")
+
+    stats = {
+        "checked": len(statuses),
+        "alive":   sum(1 for s in statuses.values() if s == "alive"),
+        "dead":    sum(1 for s in statuses.values() if s == "dead"),
+        "unknown": sum(1 for s in statuses.values() if s == "unknown"),
+        "duration_s": round(time.time() - t0, 1),
+        "skipped": None,
+    }
+    log.info(f"  [{profile_key}] Weryfikacja: żywe={stats['alive']} martwe={stats['dead']} "
+             f"nierozstrzygnięte={stats['unknown']} ({stats['duration_s']}s)")
+    for s in unknown_samples:
+        log.info(f"    [VERIFY-UNKNOWN] {s}")
+    return statuses, stats
+
+
+def verify_missing_for_profile(profile_key, result):
+    """Uzupełnia `result` o mapę id→status dla ofert z bazy nieobecnych w sweepie.
+
+    Nie weryfikujemy, gdy zaginionych jest podejrzanie dużo — wtedy zepsuty jest
+    sweep, nie oferty (i nie ma sensu wysyłać setek żądań, żeby to potwierdzić).
+    """
+    if not VERIFY_MISSING_ENABLED:
+        return
+    if result.get("crosscheck") in ("error", "anomaly_detected") or not result.get("count"):
+        return
+    data    = load_existing_json()
+    current = data.get("profiles", {}).get(profile_key, {}).get("current_listings", [])
+    if not current:
+        return
+    scraped = {l["listing_id"] for l in result["listings"]}
+    missing = [l for l in current if l.get("id") not in scraped and l.get("url")]
+    if not missing:
+        result["verification"] = {}
+        result["verification_stats"] = {"checked": 0, "alive": 0, "dead": 0,
+                                        "unknown": 0, "skipped": None}
+        return
+
+    ratio = len(missing) / len(current)
+    if ratio > SANITY_MAX_MISSING_RATIO or len(missing) > VERIFY_MAX_LISTINGS:
+        reason = (f"{len(missing)} zaginionych ({ratio*100:.1f}% bazy) — "
+                  f"to sygnał niepełnego sweepu, nie odpływu ofert; pomijam weryfikację")
+        log.warning(f"  [{profile_key}] {reason}")
+        result["verification"] = {}
+        result["verification_stats"] = {"checked": 0, "alive": 0, "dead": 0,
+                                        "unknown": 0, "skipped": reason}
+        return
+
+    statuses, stats = verify_listings_alive(profile_key, missing)
+    result["verification"] = statuses
+    result["verification_stats"] = stats
+
 
 # ─── Excel ───────────────────────────────────────────────────────────────────
 
@@ -874,6 +1172,14 @@ def update_excel(scan_results, scan_timestamp):
 
 # ─── JSON for Dashboard ───────────────────────────────────────────────────────
 
+def _days_since(ts_str, now_dt):
+    """Ile dni minęło od znacznika "%Y-%m-%d %H:%M:%S" (None gdy nie da się sparsować)."""
+    try:
+        return (now_dt - datetime.strptime(str(ts_str)[:19], "%Y-%m-%d %H:%M:%S")).days
+    except Exception:
+        return None
+
+
 def load_existing_json():
     if os.path.exists(JSON_PATH):
         try:
@@ -929,9 +1235,11 @@ def generate_dashboard_json(scan_results, scan_timestamp):
 
         crosscheck   = result.get("crosscheck","")
         header_count = result.get("header_count")
+        # Wynik bezpośredniego sprawdzenia ofert nieobecnych w sweepie (id → alive/dead/unknown).
+        verification = result.get("verification") or {}
         # SAFETY: Każda z poniższych sytuacji oznacza uszkodzony scan, którego NIE wolno propagować:
         # 1) crosscheck == "error"  — wyjątek podczas scrapowania
-        # 2) crosscheck == "anomaly_detected" — sanity check wykrył anomalię (count=0, spadek>40%, itp.)
+        # 2) crosscheck == "anomaly_detected" — sanity check wykrył anomalię (count=0, spadek, ucięta paginacja...)
         # 3) count == 0 — pusty scan jest ZAWSZE błędem (niezależnie od header_count)
         is_scraper_error = (
             crosscheck in ("error", "anomaly_detected")
@@ -952,20 +1260,11 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         old_ids         = {l["id"] for l in pd_.get("current_listings",[])}
         newly_detected  = [l for l in result["listings"] if l["listing_id"] not in old_ids]
 
-        if len(old_ids) == 0 and len(dc) == 0:
-            flow_added = None; flow_removed = None
-        else:
-            flow_added   = len(current_ids_new - old_ids)
-            # "Znikło" = ogłoszenia POTWIERDZONE jako usunięte w tym scanie, czyli te,
-            # które przechodzą do archived_listings (missing_count osiąga 2 — druga
-            # nieobecność z rzędu). NIE liczymy każdej pojedynczej nieobecności, bo
-            # OLX regularnie zwraca niekompletne wyniki (mix Otodom) i pierwsza
-            # nieobecność jest zwykle fałszywa. To samo kryterium co archiwizacja niżej:
-            # listing nieobecny teraz, który miał już missing_count >= 1, zostanie zarchiwizowany.
-            flow_removed = sum(
-                1 for l in pd_.get("current_listings", [])
-                if l["id"] not in current_ids_new and int(l.get("missing_count", 0) or 0) >= 1
-            )
+        # "Znikło" liczymy dopiero PO archiwizacji, jako len(newly_archived) — czyli
+        # dokładnie te oferty, które w tym scanie zostały POTWIERDZONE jako usunięte:
+        # bezpośrednim sprawdzeniem URL-a albo drugą nieobecnością z rzędu.
+        first_run  = (len(old_ids) == 0 and len(dc) == 0)
+        flow_added = None if first_run else len(current_ids_new - old_ids)
 
         total  = result["count"]
         promo_count = sum(1 for l in result["listings"] if l.get("is_promoted"))
@@ -981,36 +1280,6 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             median_price = sp[n//2] if n%2 != 0 else (sp[n//2-1]+sp[n//2])//2
         else:
             median_price = None
-
-        # ── daily_counts ──
-        today_entry = next((d for d in dc if d["date"] == today), None)
-        if today_entry:
-            if result["count"] >= today_entry["count"]:
-                today_entry["count"]               = result["count"]
-                today_entry["timestamp"]           = now_str
-                today_entry["median_price"]        = median_price
-                today_entry["promoted_count"]      = promo_count
-                today_entry["promoted_percentage"] = promo_pct
-                today_entry["price_distribution"]  = price_dist
-                prev_added   = today_entry.get("added") or 0
-                prev_removed = today_entry.get("removed") or 0
-                if flow_added is not None:
-                    today_entry["added"]   = prev_added + flow_added
-                    today_entry["removed"] = prev_removed + flow_removed
-                if len(dc) >= 2:
-                    today_entry["change"] = result["count"] - dc[-2]["count"]
-        else:
-            prev_c = dc[-1]["count"] if dc else None
-            ch     = result["count"] - prev_c if prev_c is not None else 0
-            dc.append({
-                "date": today, "count": result["count"], "change": ch,
-                "timestamp": now_str, "median_price": median_price,
-                "promoted_count": promo_count, "promoted_percentage": promo_pct,
-                "price_distribution": price_dist,
-                "refreshed_count": 0, "reactivated_count": 0,
-                "added": flow_added, "removed": flow_removed,
-            })
-        if len(dc) > 90: pd_["daily_counts"] = dc[-90:]
 
         # ── Build new_listings ──
         new_listings = []
@@ -1128,30 +1397,62 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                     nl["promoted_days_current"] = 1
                     nl["promoted_sessions_count"] = 1
 
-        # ── Archiving (z mechanizmem 2-scan confirmation) ──
-        # Ogłoszenie znika z OLX → missing_count += 1
-        # Archiwizujemy dopiero gdy missing_count >= 2 (potwierdzenie w 2 kolejnych scanach)
-        # "Missing once" pozostaje w current_listings, ale bez aktualizacji last_seen
-        newly_archived = []
-        carried_missing = []  # missing_count == 1, pozostają w current_listings
+        # ── Archiwizacja ──
+        # Kolejność werdyktów:
+        #   1. weryfikacja po URL-u oferty — pomiar, nie domysł (alive / dead)
+        #   2. gdy nierozstrzygnięta (403, timeout, nieznany layout) → stara heurystyka:
+        #      archiwizacja dopiero przy drugiej nieobecności z rzędu.
+        newly_archived  = []
+        carried_missing = []   # nierozstrzygnięte, zostają w current_listings
+        verified_alive  = []   # nieobecne w sweepie, ale OLX potwierdził, że żyją
         new_ids = {nl["id"] for nl in new_listings}
+
+        def _archive(old_l, reason):
+            old_l["archived_date"]   = now_str
+            old_l["archived_reason"] = reason
+            old_l.pop("missing_count", None)  # czyścimy przed archiwizacją
+            r_hist = old_l.get("reactivation_history",[])
+            if r_hist and "active_to_current" not in r_hist[-1]:
+                r_hist[-1]["active_to_current"] = now_str
+            old_l["reactivation_count"] = len(r_hist)
+            if not old_l.get("refresh_history"): old_l["refresh_history"] = []
+            if not old_l.get("refresh_count"):   old_l["refresh_count"] = len(old_l["refresh_history"])
+            pd_["archived_listings"].append(old_l)
+            newly_archived.append(old_l)
+
         for old_l in pd_.get("current_listings",[]):
             if old_l["id"] in new_ids:
                 continue  # ogłoszenie zostało znalezione w tym scanie — obsłużone w new_listings
+            status = verification.get(old_l["id"])
+
+            if status == "alive":
+                # Sweep ją zgubił, ale oferta żyje — zostaje aktywna, licznik nieobecności zerujemy.
+                days_unseen = _days_since(old_l.get("last_seen"), scan_timestamp)
+                if days_unseen is not None and days_unseen > VERIFY_MAX_ALIVE_DAYS:
+                    # Bezpiecznik: gdyby detekcja martwej strony przestała działać,
+                    # oferta trzymana wyłącznie weryfikacją nie może wisieć w nieskończoność.
+                    log.warning(f"  [STALE-ALIVE] {old_l['id']}: żywa wg URL, ale nieobecna w sweepie "
+                                f"od {days_unseen} dni — archiwizuję")
+                    _archive(old_l, "stale_verified_alive")
+                    continue
+                old_l["missing_count"]     = 0
+                old_l["last_verified"]     = now_str
+                old_l["verified_alive_at"] = now_str
+                verified_alive.append(old_l)
+                log.info(f"  [VERIFIED-ALIVE] {old_l['id']}: {old_l.get('title','')[:50]}")
+                continue
+
+            if status == "dead":
+                old_l["last_verified"] = now_str
+                _archive(old_l, "verified_dead")
+                log.info(f"  [ARCHIVED] {old_l['id']} (URL potwierdza usunięcie): {old_l.get('title','')[:50]}")
+                continue
+
             prev_missing = int(old_l.get("missing_count", 0) or 0)
             new_missing = prev_missing + 1
             if new_missing >= 2:
                 # Druga nieobecność z rzędu → archiwizacja
-                old_l["archived_date"] = now_str
-                old_l.pop("missing_count", None)  # czyścimy przed archiwizacją
-                r_hist = old_l.get("reactivation_history",[])
-                if r_hist and "active_to_current" not in r_hist[-1]:
-                    r_hist[-1]["active_to_current"] = now_str
-                old_l["reactivation_count"] = len(r_hist)
-                if not old_l.get("refresh_history"): old_l["refresh_history"] = []
-                if not old_l.get("refresh_count"):   old_l["refresh_count"] = len(old_l["refresh_history"])
-                pd_["archived_listings"].append(old_l)
-                newly_archived.append(old_l)
+                _archive(old_l, "missing_2x")
                 log.info(f"  [ARCHIVED] {old_l['id']} (missing 2× z rzędu): {old_l.get('title','')[:50]}")
             else:
                 # Pierwsza nieobecność → trzymamy w current_listings z markerem
@@ -1179,6 +1480,60 @@ def generate_dashboard_json(scan_results, scan_timestamp):
         for nl in new_listings:
             nl["missing_count"] = 0
 
+        # ── daily_counts ──
+        # `count`        — ile ofert zwrócił sweep (semantyka niezmieniona, żeby seria
+        #                  historyczna dalej się zgadzała)
+        # `active_count` — ile ofert uznajemy za żywe: znalezione w sweepie
+        #                  + potwierdzone po URL-u + nierozstrzygnięte (czekają na drugą
+        #                  nieobecność). To jest liczba "aktywnych ofert" dla dashboardu.
+        flow_removed = None if first_run else len(newly_archived)
+        active_count = len(new_listings) + len(verified_alive) + len(carried_missing)
+        scan_meta = {
+            "active_count":       active_count,
+            "verified_alive":     len(verified_alive),
+            "verified_dead":      sum(1 for l in newly_archived
+                                      if l.get("archived_reason") == "verified_dead"),
+            "unresolved_missing": len(carried_missing),
+            "pages_scraped":      result.get("pages_scraped"),
+            "pages_expected":     result.get("pages_expected"),
+            "header_count":       header_count,
+        }
+        today_entry = next((d for d in dc if d["date"] == today), None)
+        if today_entry:
+            if result["count"] >= today_entry["count"]:
+                today_entry["count"]               = result["count"]
+                today_entry["timestamp"]           = now_str
+                today_entry["median_price"]        = median_price
+                today_entry["promoted_count"]      = promo_count
+                today_entry["promoted_percentage"] = promo_pct
+                today_entry["price_distribution"]  = price_dist
+                today_entry.update(scan_meta)
+                prev_added   = today_entry.get("added") or 0
+                prev_removed = today_entry.get("removed") or 0
+                if flow_added is not None:
+                    today_entry["added"]   = prev_added + flow_added
+                    today_entry["removed"] = prev_removed + flow_removed
+                if len(dc) >= 2:
+                    today_entry["change"] = result["count"] - dc[-2]["count"]
+                    prev_active = dc[-2].get("active_count") or dc[-2]["count"]
+                    today_entry["active_change"] = active_count - prev_active
+        else:
+            prev_c      = dc[-1]["count"] if dc else None
+            prev_active = (dc[-1].get("active_count") or dc[-1]["count"]) if dc else None
+            ch          = result["count"] - prev_c if prev_c is not None else 0
+            entry = {
+                "date": today, "count": result["count"], "change": ch,
+                "active_change": (active_count - prev_active) if prev_active is not None else 0,
+                "timestamp": now_str, "median_price": median_price,
+                "promoted_count": promo_count, "promoted_percentage": promo_pct,
+                "price_distribution": price_dist,
+                "refreshed_count": 0, "reactivated_count": 0,
+                "added": flow_added, "removed": flow_removed,
+            }
+            entry.update(scan_meta)
+            dc.append(entry)
+        if len(dc) > 90: pd_["daily_counts"] = dc[-90:]
+
         # ── Count refreshes & reactivations today ──
         reactivated_count = 0; refreshed_count = 0
         for l in list(new_listings) + newly_archived:
@@ -1191,8 +1546,8 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             te["reactivated_count"] = reactivated_count
             te["refreshed_count"]   = refreshed_count
 
-        # current_listings = realnie znalezione + carry-over (missing 1×)
-        pd_["current_listings"] = new_listings + carried_missing
+        # current_listings = znalezione w sweepie + potwierdzone po URL-u + nierozstrzygnięte
+        pd_["current_listings"] = new_listings + verified_alive + carried_missing
 
         # ── Zapora: masowy "missing" w jednym scanie ──────────────────────
         # Gdy duża część bazy znika w pojedynczym scanie (carried_missing), to
@@ -1211,6 +1566,7 @@ def generate_dashboard_json(scan_results, scan_timestamp):
                 "base_count":        base_for_missing,
                 "scanned_count":     result["count"],
                 "missing_ratio":     round(missing_ratio, 3),
+                "verification_skipped": (result.get("verification_stats") or {}).get("skipped"),
                 "message": (f"{freshly_missing} z {base_for_missing} ofert "
                             f"({missing_ratio*100:.1f}%) zniknęło w jednym scanie — "
                             f"prawdopodobnie niepełny scrape OLX, nie realny odpływ"),
@@ -1228,17 +1584,29 @@ def generate_dashboard_json(scan_results, scan_timestamp):
             else:
                 del ph_map[ph_lid]
 
-        scan_entry["profiles"][pk] = {"count": result["count"], "crosscheck": crosscheck}
+        scan_entry["profiles"][pk] = {
+            "count": result["count"], "active_count": active_count, "crosscheck": crosscheck,
+            "verified_alive": scan_meta["verified_alive"], "verified_dead": scan_meta["verified_dead"],
+        }
         if partial_scan_warning:
             scan_entry["profiles"][pk]["partial_scan_warning"] = partial_scan_warning
 
         # Zapisz flow stats per profil
+        vstats = result.get("verification_stats") or {}
         profile_flow_stats[pk] = {
             "label":            PROFILES[pk]["label"],
-            "listings_total":   result["count"],
+            "listings_total":   result["count"],       # znalezione w sweepie (bez zmian semantyki)
+            "listings_active":  active_count,          # uznane za żywe (nowa metryka)
             "listings_new":     flow_added,
             "listings_removed": flow_removed,
             "crosscheck":       crosscheck,
+            "verified_alive":   scan_meta["verified_alive"],
+            "verified_dead":    scan_meta["verified_dead"],
+            "verified_unknown": vstats.get("unknown"),
+            "verification_skipped": vstats.get("skipped"),
+            "pages_scraped":    result.get("pages_scraped"),
+            "pages_expected":   result.get("pages_expected"),
+            "header_count":     header_count,
             "partial_scan_warning": partial_scan_warning,
         }
 
@@ -1260,6 +1628,9 @@ def run_scan():
     for pk, cfg in PROFILES.items():
         try:
             r = scrape_with_crosscheck(pk, cfg)
+            # Oferty z bazy nieobecne w sweepie sprawdzamy bezpośrednio po ich URL-u —
+            # dopiero z tym werdyktem generate_dashboard_json decyduje o archiwizacji.
+            verify_missing_for_profile(pk, r)
             results[pk] = r
             log.info(f"[OK] {pk}: {r['count']} listings ({r['crosscheck']})")
         except Exception as e:

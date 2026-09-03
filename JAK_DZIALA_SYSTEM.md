@@ -145,7 +145,15 @@ headers = {
         {
           "date": "2026-04-29",
           "count": 142,
+          "active_count": 150,
           "change": +5,
+          "active_change": +6,
+          "verified_alive": 8,
+          "verified_dead": 3,
+          "unresolved_missing": 0,
+          "pages_scraped": 17,
+          "pages_expected": 17,
+          "header_count": 1200,
           "timestamp": "2026-04-29 09:00:00",
           "median_price": 2500
         }
@@ -163,13 +171,19 @@ headers = {
 }
 ```
 
+**`count` vs `active_count`**: `count` to ile ofert zwrócił przegląd listingu, `active_count` — ile ofert uznajemy za żywe (sweep + potwierdzone bezpośrednim sprawdzeniem URL-a + czekające na potwierdzenie). Listing OLX regularnie gubi część ofert, więc `active_count >= count` i to ona jest właściwą „liczbą aktywnych ofert" (dashboard, `api.json` → `active_listings`). `count` zostaje niezmieniony, żeby seria historyczna była porównywalna.
+
 **Ważna zasada dla `median_price`**: to mediana cen ogłoszeń, których `first_seen` = data danego wpisu daily_counts (nowe ogłoszenia tego dnia). `None` oznacza brak nowych ogłoszeń — to prawidłowe zachowanie.
 
 ### 4.2 Śledzenie ogłoszeń
 
 - **Nowe ogłoszenie**: pojawia się w wynikach → dodawane do `current_listings`
 - **Istniejące**: aktualizowany `last_seen`, śledzona zmiana ceny
-- **Znikające**: przenoszane do `archived_listings` z `archived_date`
+- **Znikające**: oferta nieobecna w sweepie jest sprawdzana BEZPOŚREDNIO po swoim URL-u:
+  - odpowiedź jednoznacznie martwa (404/410, fraza wygaszonego ogłoszenia, przekierowanie poza `/oferta/`) → `archived_listings` od razu, `archived_reason: "verified_dead"`
+  - odpowiedź potwierdza, że oferta żyje → zostaje w `current_listings`, `verified_alive_at`, `missing_count` = 0
+  - brak rozstrzygnięcia (403/timeout/nieznany layout) → stara ścieżka: archiwizacja przy drugiej nieobecności z rzędu (`archived_reason: "missing_2x"`)
+  - bezpiecznik: oferta trzymana wyłącznie weryfikacją, niewidziana w listingu ponad `VERIFY_MAX_ALIVE_DAYS` (7) dni → `archived_reason: "stale_verified_alive"`
 - **Powracające** (reactivation): ogłoszenie z `archived_listings` pojawia się ponownie → `reactivation_history[]`
 - **Odświeżone** (refresh): zmiana daty `refreshed` przy tej samej cenie → `refresh_history[]`
 

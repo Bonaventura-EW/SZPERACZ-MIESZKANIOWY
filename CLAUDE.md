@@ -49,25 +49,47 @@ main.py → scraper.run_scan() → OLX (HTTP + BeautifulSoup)
 
 **Pipeline scanu:**
 1. `scrape_with_crosscheck()` — scrape + sanity check + ewentualny retry po 90s cooldown
-2. `generate_dashboard_json()` — merge z istniejącym stanem (śledzi nowe/usunięte/reakt./odświeżenia/promocje)
-3. `update_excel()` — musi być wywołany PO `generate_dashboard_json()` (czyta z JSON refresh_count)
+2. `verify_missing_for_profile()` — oferty z bazy nieobecne w sweepie sprawdzane bezpośrednio po ich URL-u
+3. `generate_dashboard_json()` — merge z istniejącym stanem (śledzi nowe/usunięte/reakt./odświeżenia/promocje)
+4. `update_excel()` — musi być wywołany PO `generate_dashboard_json()` (czyta z JSON refresh_count).
+   Excel pozostaje logiem SWEEPU (`result["listings"]`), nie listy aktywnych — kolumna „Liczba ogłoszeń" = `count`.
+
+**Dwie różne liczby — nie mylić:**
+- `count` = ile ofert zwrócił przegląd listingu OLX (surowy wynik sweepu)
+- `active_count` = ile ofert uznajemy za żywe = sweep + potwierdzone po URL-u + nierozstrzygnięte.
+  To ta liczba idzie na dashboard i do `api.json` jako `active_listings`. `count` zostaje bez zmian,
+  żeby 90-dniowa seria historyczna była porównywalna.
 
 **Sanity checks (zapora przed fałszywymi scanami):**
 - `SANITY_MIN_COUNT = 50` — poniżej tej liczby = podejrzenie CAPTCHA/błędu
 - `SANITY_MIN_HEADER = 10` — jeśli nagłówek OLX zwraca <10 = strona się nie załadowała
-- `SANITY_MIN_DURATION_S = 30` — scan szybszy niż 30s = redirect/CAPTCHA
-- `SANITY_MAX_DROP_RATIO = 0.40` — spadek >40% vs ostatni udany scan = czerwona flaga
+- `SANITY_MIN_DURATION_S = 5` — próg na natychmiastowy redirect/CAPTCHA. Po zrównolegleniu paginacji
+  czas przestał być miarą kompletności — tę rolę pełnią liczniki stron (niżej)
+- `SANITY_MAX_DROP_RATIO = 0.20` — spadek >20% vs ostatni udany scan = czerwona flaga
+- **Kompletność sweepu**: `failed_pages` (strona nie pobrana), `pages_scraped < pages_expected`
+  (mniej stron niż zapowiadała paginacja), `empty_pages` (dziura w środku) — każde z osobna odrzuca scan.
+  Wcześniej sweep ucięty w połowie zapisywał się jako pełnoprawny
 - Przy anomalii: `crosscheck = "anomaly_detected"` → `generate_dashboard_json()` NIE modyfikuje danych
 
-**Mechanizm archiwizacji (2-scan confirmation):**
-- Ogłoszenie nieznalezione w scanie: `missing_count += 1`, zostaje w `current_listings`
-- Dopiero przy `missing_count >= 2` (dwie nieobecności z rzędu) → przeniesienie do `archived_listings`
-- Zabezpiecza przed masową fałszywą archiwizacją gdy OLX zwróci niekompletne wyniki
+**Mechanizm archiwizacji (najpierw pomiar, potem heurystyka):**
+1. `classify_offer_page()` na podstawie odpowiedzi z URL-a oferty: `dead` → archiwizacja natychmiast,
+   `alive` → oferta zostaje aktywna (`missing_count` = 0, `verified_alive_at`)
+2. `unknown` (403/timeout/nieznany layout) → stara ścieżka 2-scan confirmation:
+   `missing_count += 1`, archiwizacja dopiero przy drugiej nieobecności z rzędu
+- Do `dead` schodzimy WYŁĄCZNIE na jednoznaczny sygnał — pomyłka w tę stronę przy blokadzie WAF
+  zarchiwizowałaby całą bazę w jednym scanie
+- Weryfikacja jest pomijana, gdy zaginionych > `SANITY_MAX_MISSING_RATIO` bazy lub > `VERIFY_MAX_LISTINGS`
+  (tyle ofert naraz nie znika → zepsuty jest sweep, nie oferty)
+- `VERIFY_MAX_ALIVE_DAYS = 7` — bezpiecznik na wypadek, gdyby detekcja martwej strony przestała działać
 
 **Paginacja:**
-- Standardowo: `[data-testid="pagination-forward"]`
-- Fallback gdy OLX ukryje przycisk przed końcem: szuka max `page=N` w linkach paginacji
-- Ochrona przed zapętleniem: jeśli kolejna strona zwraca te same ID → koniec
+- `build_start_url()` wymusza stabilne sortowanie `search[order]=created_at:desc` — domyślna „trafność"
+  przetasowuje listę między żądaniami i przy paginacji offsetowej oferty wypadają między stronami
+- Strona 1 sekwencyjnie (daje `header_count` i `get_last_page_number()`), strony 2..N równolegle
+  (`PAGE_WORKERS = 4`) — sweep skraca się z ~2 min do ~20 s, tyle samo razy zwęża się okno na przesunięcie listy
+- Gdy OLX nie pokazuje numerów stron → tryb sekwencyjny; „ogon" poza oknem numerów dobierany sekwencyjnie
+- URL-e stron buduje `page_url()` przez `urllib.parse` — sklejanie stringami gubiło parametr sortowania
+- Sesje `curl_cffi` nie są thread-safe: każdy wątek trzyma własną (`_thread_local`)
 
 **Parsowanie kart OLX (`[data-cy="l-card"]`):**
 - Każda karta ma WIELE linków `/d/oferta/`. Pierwszy owija obraz (pusty tekst) — iteruj wszystkie
@@ -92,7 +114,8 @@ Nie dodawaj: `Accept-Encoding: gzip` (solo), `DNT`, `Cache-Control`, `Referer` �
     "mieszkania_lublin": {
       "daily_counts": [{"date", "count", "change", "median_price", "promoted_count", ...}],
       "current_listings": [{"id", "title", "price", "first_seen", "last_seen",
-                            "missing_count", "refresh_count", "refresh_history",
+                            "missing_count", "verified_alive_at", "last_verified",
+                            "refresh_count", "refresh_history",
                             "reactivation_count", "reactivation_history",
                             "is_promoted", "promoted_days_current", ...}],
       "archived_listings": [...],
@@ -104,6 +127,10 @@ Nie dodawaj: `Accept-Encoding: gzip` (solo), `DNT`, `Cache-Control`, `Referer` �
 ```
 
 `median_price` w `daily_counts` = mediana cen NOWYCH ogłoszeń z danego dnia (nie wszystkich). `None` = brak nowych → prawidłowe zachowanie.
+
+Wpis `daily_counts` ma też `active_count`, `active_change`, `verified_alive`, `verified_dead`,
+`unresolved_missing`, `pages_scraped`, `pages_expected`, `header_count`. Wpisy sprzed wprowadzenia
+weryfikacji ich nie mają — front spada wtedy na `count` (helper `activeOf()` w `docs/index.html`).
 
 ### main.py
 
@@ -127,6 +154,8 @@ Git commit po scanie: `git add data/` (nie `git add -A` — docs/ i kod nie maj�
 
 - `openpyxl`: `Font(color="inherit")` → błąd. Używaj hex lub pomiń parametr.
 - Liczniki muszą być spójne: `refresh_count == len(refresh_history)`, `reactivation_count == len(reactivation_history)`.
+- `active_count` musi się równać `len(current_listings)` — jeśli się rozjedzie, któraś lista jest budowana obok drugiej.
+- `removed` w `daily_counts` = `len(newly_archived)`, czyli POTWIERDZONE usunięcia (nie każda nieobecność).
 - OLX miesza ~38% kart Otodom w wynikach kategorii → tolerancja crosschecka = 50% header_count.
 - `scan_status.json` zawiera `error_detail` (traceback); `scan_history.json` go nie zawiera (za ciężkie).
 - Dodając nowy profil do `PROFILES` — dodaj też konfigurację w `docs/index.html` jeśli dashboard ma go wyświetlać.

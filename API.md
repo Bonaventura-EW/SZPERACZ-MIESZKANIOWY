@@ -207,6 +207,7 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 {
   "last_updated": "2026-05-31T09:48:51Z",
   "total_listings": 590,
+  "active_listings": 623,
   "scans": [
     { "date": "2026-05-31", "timestamp": "2026-05-31T09:48:51Z", "total_listings": 590, "added": 26, "removed": 32 },
     { "date": "2026-05-30", "timestamp": "2026-05-30T09:23:55Z", "total_listings": 585, "added": 10, "removed": 26 },
@@ -220,11 +221,13 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | Pole | Typ | Opis |
 |------|-----|------|
 | `last_updated` | string | Czas ostatniego scanu (UTC, ISO 8601). Równy `scans[0].timestamp`. |
-| `total_listings` | int / null | Liczba aktywnych ogłoszeń po ostatnim scanie (profil `mieszkania_lublin`). |
+| `total_listings` | int / null | Liczba ogłoszeń znalezionych w przeglądzie listingu (profil `mieszkania_lublin`). |
+| `active_listings` | int / null | Liczba ogłoszeń uznanych za aktywne — sweep + oferty potwierdzone bezpośrednim sprawdzeniem URL-a. Ta wartość jest właściwą „liczbą aktywnych ofert"; `total_listings` bywa od niej niższa, bo listing OLX gubi część ofert. |
 | `scans` | array | Maks. **3 ostatnie udane** scany, od najnowszego (scany z błędem pomijane). |
 | `scans[].date` | string | Data scanu `YYYY-MM-DD`. |
 | `scans[].timestamp` | string | Dokładny czas scanu (UTC). |
-| `scans[].total_listings` | int / null | Liczba ogłoszeń w momencie tego scanu. |
+| `scans[].total_listings` | int / null | Liczba ogłoszeń znalezionych w sweepie w momencie tego scanu. |
+| `scans[].active_listings` | int / null | Liczba ogłoszeń uznanych za aktywne w momencie tego scanu (`null` dla scanów sprzed wprowadzenia weryfikacji). |
 | `scans[].added` | int / null | Nowe ogłoszenia vs poprzedni scan (`null` przy pierwszym scanie w historii). |
 | `scans[].removed` | int / null | Ogłoszenia, które zniknęły vs poprzedni scan (`null` przy pierwszym scanie). |
 | `warning` | string | (opcjonalne) Obecne tylko gdy ostatni scan był niepełny (`partial_scan`) — opis masowego „missing". |
@@ -244,7 +247,8 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 | `timestamp_local` | string / null | Czas lokalny (CET/CEST) |
 | `duration_seconds` | int / null | Czas trwania scanu w sekundach |
 | `scan_number` | int | Numer kolejny scanu (rośnie od 1) |
-| `listings_total` | int / null | Łączna liczba ogłoszeń (suma profili) |
+| `listings_total` | int / null | Łączna liczba ogłoszeń **znalezionych w przeglądzie listingu** (suma profili). Semantyka niezmieniona |
+| `listings_active` | int / null | Łączna liczba ogłoszeń **uznanych za aktywne**: znalezione w sweepie + potwierdzone bezpośrednim sprawdzeniem URL-a + czekające na potwierdzenie. To jest właściwa „liczba aktywnych ofert" (≥ `listings_total`) |
 | `listings_new` | int / null | Łączna liczba nowych ogłoszeń |
 | `listings_removed` | int / null | Łączna liczba usuniętych ogłoszeń |
 | `profiles` | array | Szczegóły per profil (patrz niżej) |
@@ -258,7 +262,15 @@ Lekki endpoint dla aplikacji mobilnych/widżetów: łączna liczba ogłoszeń + 
 |------|-----|------|
 | `key` | string | Identyfikator profilu, np. `"mieszkania_lublin"` |
 | `label` | string | Czytelna nazwa profilu |
-| `listings_total` | int / null | Liczba ogłoszeń w tym profilu |
+| `listings_total` | int / null | Liczba ogłoszeń znalezionych w przeglądzie listingu tego profilu |
+| `listings_active` | int / null | Liczba ogłoszeń uznanych za aktywne w tym profilu |
+| `verified_alive` | int / null | Ile ofert nieobecnych w listingu potwierdzono jako żywe (sprawdzenie po URL-u) |
+| `verified_dead` | int / null | Ile ofert potwierdzono jako usunięte (natychmiastowa archiwizacja, bez czekania na drugi scan) |
+| `verified_unknown` | int / null | Ile sprawdzeń nie dało rozstrzygnięcia (403/timeout/nieznany layout) — te idą starą ścieżką 2-scan |
+| `verification_skipped` | string | (opcjonalne) Powód pominięcia weryfikacji — zwykle zbyt wiele zaginionych ofert naraz (sygnał niepełnego sweepu) |
+| `pages_scraped` | int / null | Ile stron paginacji faktycznie pobrano |
+| `pages_expected` | int / null | Ile stron zapowiadała paginacja OLX (`null` gdy OLX nie pokazał numerów) |
+| `header_count` | int / null | Liczba z nagłówka OLX „Znaleźliśmy N ogłoszeń" (zawiera też karty Otodom) |
 | `listings_new` | int / null | Nowe ogłoszenia w tym profilu (null przy pierwszym scanie) |
 | `listings_removed` | int / null | Usunięte ogłoszenia w tym profilu (null przy pierwszym scanie) |
 | `crosscheck` | string / null | Wynik weryfikacji: `"passed"`, `"passed_retry"`, `"consistent"`, `"best_of_two"`, `"anomaly_detected"`, `"error"` |

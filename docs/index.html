@@ -229,6 +229,8 @@ input[type=range].day-slider::-moz-range-thumb{
 .date-cell{font-family:var(--font-display);font-size:11px;color:var(--text-secondary);}
 .num-cell{font-family:var(--font-display);font-size:12px;font-weight:600;text-align:center;}
 .new-badge{display:inline-block;padding:1px 6px;background:var(--accent);color:var(--blue);border-radius:3px;font-size:9px;font-weight:700;font-family:var(--font-display);margin-left:5px;}
+.verified-badge{display:inline-block;margin-left:5px;font-size:10px;color:var(--blue-light);cursor:help;}
+.pending-badge{display:inline-block;margin-left:5px;font-size:10px;color:var(--text-muted);cursor:help;}
 .promo-star{font-size:16px;display:inline-block;line-height:1;cursor:default;}
 .promo-icon-top_listing{color:#f59e0b;}
 .promo-icon-bump{color:#3b82f6;}
@@ -616,6 +618,12 @@ function fmtDT(d) {
   return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+// Liczba aktywnych ofert = sweep + oferty potwierdzone bezpośrednio po URL-u
+// + nierozstrzygnięte. Wpisy sprzed wprowadzenia weryfikacji nie mają active_count,
+// więc spadamy wtedy na count (surowy wynik sweepu).
+function activeOf(entry)  { return (entry && (entry.active_count ?? entry.count)) || 0; }
+function activeChange(e)  { return (e && (e.active_change ?? e.change)) || 0; }
+
 // ─── Hero card ─────────────────────────────────────────────
 function renderHeroCard() {
   const profiles = dashData.profiles || {};
@@ -629,10 +637,10 @@ function renderHeroCard() {
   const avg     = prices.length ? Math.round(prices.reduce((a,b)=>a+b,0)/prices.length) : 0;
   const now     = Date.now();
   const newCount = listings.filter(l => l.first_seen && (now - new Date(l.first_seen.replace(' ','T'))) < 86400000).length;
-  const change  = latest.change || 0;
+  const change  = activeChange(latest);
 
   document.getElementById('heroName').textContent  = data.label || key;
-  document.getElementById('heroCount').textContent = latest.count || 0;
+  document.getElementById('heroCount').textContent = activeOf(latest);
   document.getElementById('heroNew').textContent   = newCount;
   document.getElementById('heroAvg').textContent   = avg ? avg.toLocaleString('pl-PL') : '—';
 
@@ -688,10 +696,15 @@ function renderStats(key) {
   const newCount = listings.filter(l => l.first_seen && (now - new Date(l.first_seen.replace(' ','T'))) < 86400000).length;
   const promoCount = listings.filter(l=>l.is_promoted).length;
   const priceChanges = listings.filter(l=>l.price_change).length;
-  const ch = latest.change || 0;
+  const ch = activeChange(latest);
+  const swept    = latest.count || 0;
+  const vAlive   = latest.verified_alive || 0;
+  const unres    = latest.unresolved_missing || 0;
 
   document.getElementById('detailStats').innerHTML = `
-    <div class="detail-stat"><div class="detail-stat-value">${latest.count||0}</div><div class="detail-stat-label">Aktywne</div></div>
+    <div class="detail-stat" title="Oferty uznane za żywe: znalezione w sweepie + potwierdzone bezpośrednio po URL-u + czekające na potwierdzenie"><div class="detail-stat-value">${activeOf(latest)}</div><div class="detail-stat-label">Aktywne</div></div>
+    <div class="detail-stat" title="Ile ofert zwrócił przegląd listingu OLX w ostatnim scanie"><div class="detail-stat-value" style="color:var(--text-secondary)">${swept}</div><div class="detail-stat-label">W sweepie</div></div>
+    <div class="detail-stat" title="Nieobecne w listingu, ale OLX potwierdził po ich URL-u, że żyją (${unres} nierozstrzygniętych)"><div class="detail-stat-value" style="color:var(--blue-light)">${vAlive}</div><div class="detail-stat-label">Potw. po URL</div></div>
     <div class="detail-stat"><div class="detail-stat-value" style="color:${ch>0?'var(--green)':ch<0?'var(--red)':'inherit'}">${ch>0?'+':''}${ch}</div><div class="detail-stat-label">Zmiana</div></div>
     <div class="detail-stat"><div class="detail-stat-value" style="color:var(--green)">${newCount}</div><div class="detail-stat-label">Nowe (24h)</div></div>
     <div class="detail-stat"><div class="detail-stat-value">${avg?avg.toLocaleString('pl-PL'):'—'}<span style="font-size:12px"> zł</span></div><div class="detail-stat-label">Śr. cena</div></div>
@@ -903,7 +916,7 @@ function renderLineChart(key) {
   }
 
   const labels          = counts.map(d => { const p=d.date.slice(5).split('-'); return `${p[1]}.${p[0]}`; });
-  const countData       = counts.map(d => d.count);
+  const countData       = counts.map(d => activeOf(d));
   const medianData      = counts.map(d => d.median_price || null);
   const promotedPctData = counts.map(d => d.promoted_percentage || 0);
   const promotedCntData = counts.map(d => d.promoted_count || 0);
@@ -916,7 +929,7 @@ function renderLineChart(key) {
 
   const metricConfig = {
     count: {
-      label:'Liczba ogłoszeń', data:countData, color:ACCENT, suffix:' ogłoszeń'
+      label:'Aktywne ogłoszenia', data:countData, color:ACCENT, suffix:' ogłoszeń'
     },
     median_price: {
       label:'Mediana ceny nowych', data:medianData, color:GREEN, suffix:' zł'
@@ -1179,6 +1192,12 @@ function renderListings(tab) {
     const newBadge = isNew && tab==='current' ? '<span class="new-badge">NOWE</span>' : '';
     const _today = new Date().toISOString().slice(0,10);
     const refreshIcon = (l.refreshed && l.refreshed.slice(0,10) === _today) ? '<span class="refresh-icon" title="Odświeżone dzisiaj">↺</span>' : '';
+    // Oferta nieobecna w ostatnim sweepie: albo potwierdzona po URL-u, albo czeka na werdykt.
+    const missBadge = (tab==='current' && l.missing_count > 0)
+      ? '<span class="pending-badge" title="Nie było jej w ostatnim przeglądzie listingu — czeka na potwierdzenie">◌</span>'
+      : (tab==='current' && l.verified_alive_at && l.last_seen && l.verified_alive_at > l.last_seen)
+        ? `<span class="verified-badge" title="Nieobecna w listingu, ale OLX potwierdził po URL-u, że oferta żyje (${esc(String(l.verified_alive_at).slice(0,16))})">✓</span>`
+        : '';
 
     const _ptRaw = l.promotion_type || (l.is_promoted ? 'top_listing' : null);
     const _pt = (PROMO_ICONS[_ptRaw] ? _ptRaw : 'default');
@@ -1205,7 +1224,7 @@ function renderListings(tab) {
     const sparkCell = buildSparkline((data.price_history||{})[l.id]||[], l.id);
 
     html += `<tr>
-      <td class="listing-title"><a href="${esc(l.url||'#')}" target="_blank">${esc(l.title||'—')}</a>${newBadge}${refreshIcon}</td>
+      <td class="listing-title"><a href="${esc(l.url||'#')}" target="_blank">${esc(l.title||'—')}</a>${newBadge}${refreshIcon}${missBadge}</td>
       <td data-label="Cena"><span class="price-tag">${price}</span></td>
       <td data-label="Trend" style="text-align:center">${sparkCell}</td>
       <td data-label="Promo" style="text-align:center">${promoStar}</td>
