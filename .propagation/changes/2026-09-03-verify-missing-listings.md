@@ -44,3 +44,22 @@ po cichu zepsułaby konsumentów.
 **Pułapka przy wdrożeniu:** przy zrównolegleniu trzeba jednocześnie ruszyć próg
 „scan trwał za krótko" w sanity checku — inaczej każdy szybki (czyli poprawny)
 scan zacznie być odrzucany jako anomalia.
+
+**Zmierzone efekty u nas (3 przebiegi, 2026-09-03).** Sweep 797 → 833 ofert (sama
+paginacja: stabilne sortowanie + równoległość, czas 115 s → 25 s). Weryfikacja po URL-u
+dołożyła 63 oferty: tyle OLX potwierdził jako żywe spośród 143 nieobecnych w listingu
+(44%). W kolejnym scanie te same 63 znów wyszły żywe będąc poza listingiem — luka jest
+systematyczna, nie przypadkowa. Liczba „usuniętych" spadła ze 143 domniemanych do 80
+potwierdzonych.
+
+**Wpadka do przepisania razem ze zmianą.** Pierwszy przebieg uznał 143/143 ofert za
+martwe: serwis jest SPA i w `<script>` wysyła komplet stringów tłumaczeń, w tym frazę
+o nieaktualnym ogłoszeniu — szukanie fraz w surowym HTML trafia więc na każdej stronie.
+Frazy trzeba dopasowywać wyłącznie w tekście widocznym (po wycięciu `script`/`style`),
+a żywy layout wykrywać selektorem na DOM, nie szukaniem atrybutu w HTML (atrybuty też
+trafiają do payloadu). Do tego zapora na wynik zbiorczy: jeśli >85% sprawdzonych ofert
+wychodzi martwych, to awaria klasyfikatora, nie zawał rynku — odrzuć całą weryfikację
+i zostaw ścieżkę 2-scan. Ta zapora złapałaby naszą wpadkę.
+
+**Sygnał, że detekcja działa:** usunięte ogłoszenie OLX zwraca HTTP 410, a nie 200
+ze stroną „nieaktualne" — u brata warto to najpierw zmierzyć na kilku URL-ach.

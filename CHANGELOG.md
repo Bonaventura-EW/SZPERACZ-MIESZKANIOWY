@@ -27,6 +27,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 - **Diagnostyka nagłówka**: scan #144 nadal zwracał `header_count=null` mimo poprawionego wzorca, a `header is None` to dla crosschecka ciche PASS. Gdy licznika nie da się sparsować, log pokazuje teraz faktyczny tekst OLX zawierający „ogłosze" (`[HEADER?]`) — następny przebieg powie, czy zmieniło się brzmienie, czy nagłówka po prostu nie ma na posortowanej liście.
 - **`active_change` liczony tylko wobec porównywalnej podstawy**: pierwszy wpis z nową metryką porównywał `active_count` (896) z gołym `count` z dnia poprzedniego (797) i pokazywał +99, choć realna zmiana sweepu to +36. Teraz przy braku `active_count` w poprzednim wpisie pole jest `null`, a front spada na `change`.
 
+### 📊 Zmierzone efekty (3 przebiegi na gałęzi, 2026-09-03)
+| | przed | po |
+|---|---|---|
+| Ogłoszenia znalezione w sweepie | 797 | **833–834** (+4,5%) |
+| Ogłoszenia uznane za aktywne | 797 (albo 881 w tabeli) | **896–897** |
+| Czas sweepu | ~115 s | **23–26 s** (26 stron) |
+| Czas całego scanu | ~115 s | 51–101 s (z weryfikacją 64–143 ofert) |
+| „Usunięte" | 143 nieobecności → archiwum po 2 scanach | **80 potwierdzonych** (reszta żyła) |
+
+- Z 143 ofert nieobecnych w listingu **63 (44%) OLX potwierdził jako żywe** — dokładnie ta klasa błędu, o którą chodziło. W kolejnym scanie te same 63 oferty znów wyszły żywe, znów będąc poza listingiem: to nie jednorazowy wypadek, tylko stała luka w przeglądzie listingu.
+- Detekcja martwej oferty potwierdzona na żywym ruchu: OLX zwraca **HTTP 410** dla usuniętego ogłoszenia (`[VERIFY-DEAD] 1bIoLr: HTTP 410`), a żywe rozpoznaje się po layoucie strony. Zero werdyktów `unknown` w obu przebiegach.
+- `header_count` nadal `null` — OLX nie renderuje licznika „Znaleźliśmy N ogłoszeń" na posortowanej liście. Crosscheck jest przez to bezzębny (`header is None` → PASS); rolę zapory pełnią liczniki stron. Diagnostyka `[HEADER?]` w logu pokaże, gdyby licznik wrócił.
+
 ### ⚙️ Workflow: Równoległa paginacja i stabilne sortowanie — mniej ofert gubionych w sweepie
 - **Problem.** Sweep szedł strona po stronie z przerwami 1,5–3 s (~2 min na 16 stron), po liście sortowanej domyślną „trafnością", którą OLX przetasowuje między żądaniami (rotacja wyróżnionych). Przy paginacji offsetowej każde przesunięcie listy w górę wypycha pierwszą ofertę strony N+1 na stronę N — już pobraną — i oferta ginie. To główne źródło chronicznego zaniżenia.
 - `build_start_url()` wymusza **stabilne sortowanie** `search[order]=created_at:desc` (profil może się wypisać przez `"stable_sort": False`). Kolejność zmienia się teraz tylko przy realnych zmianach na rynku, nie przy każdym żądaniu.
