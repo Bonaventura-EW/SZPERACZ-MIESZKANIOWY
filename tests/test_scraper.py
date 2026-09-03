@@ -166,34 +166,58 @@ def test_last_page_number_absent():
 # ── classify_offer_page ──────────────────────────────────────────────────────
 OFFER_URL = "https://www.olx.pl/d/oferta/foo-IDabc.html"
 
+def _cls(*a):
+    return scraper.classify_offer_page(*a)[0]
+
 def test_classify_404_is_dead():
-    assert scraper.classify_offer_page(404, OFFER_URL, "") == "dead"
+    assert _cls(404, OFFER_URL, "") == "dead"
 
 def test_classify_marker_is_dead():
     html = "<html><body><h2>To ogłoszenie jest już nieaktualne</h2></body></html>"
-    assert scraper.classify_offer_page(200, OFFER_URL, html) == "dead"
+    assert _cls(200, OFFER_URL, html) == "dead"
 
 def test_classify_redirect_away_is_dead():
     html = '<html><body data-testid="ad-price-container">kategoria</body></html>'
-    assert scraper.classify_offer_page(200, "https://www.olx.pl/nieruchomosci/", html) == "dead"
+    assert _cls(200, "https://www.olx.pl/nieruchomosci/", html) == "dead"
 
 def test_classify_alive_marker():
     html = '<html><div data-testid="ad-price-container">2 500 zł</div></html>'
-    assert scraper.classify_offer_page(200, OFFER_URL, html) == "alive"
+    assert _cls(200, OFFER_URL, html) == "alive"
 
 def test_classify_blocked_is_unknown():
     """403/429/5xx NIE mogą znaczyć 'martwa' — inaczej blokada WAF archiwizuje całą bazę."""
     for code in (403, 429, 500, 503):
-        assert scraper.classify_offer_page(code, OFFER_URL, "") == "unknown"
+        assert _cls(code, OFFER_URL, "") == "unknown"
 
 def test_classify_unrecognized_layout_is_unknown():
     html = "<html><body><div>coś zupełnie innego</div></body></html>"
-    assert scraper.classify_offer_page(200, OFFER_URL, html) == "unknown"
+    assert _cls(200, OFFER_URL, html) == "unknown"
 
-def test_classify_dead_marker_wins_over_alive_marker():
+def test_classify_conflicting_signals_is_unknown():
+    """Żywy layout + fraza o nieaktualnym ogłoszeniu = nie wiemy. Nie archiwizujemy."""
     html = ('<html><div data-testid="ad-price-container">2 500 zł</div>'
             '<p>Ogłoszenie zostało usunięte</p></html>')
-    assert scraper.classify_offer_page(200, OFFER_URL, html) == "dead"
+    assert _cls(200, OFFER_URL, html) == "unknown"
+
+def test_classify_ignores_markers_inside_script():
+    """REGRESJA (scan #142): OLX wysyła w payloadzie SPA komplet tłumaczeń, w tym frazę
+    o nieaktualnym ogłoszeniu — szukanie w surowym HTML dawało 143/143 'martwych'."""
+    html = ('<html><head><script id="__NEXT_DATA__" type="application/json">'
+            '{"i18n":{"ad.inactive":"To ogłoszenie jest już nieaktualne"}}</script></head>'
+            '<body><div data-testid="ad-price-container">2 500 zł</div></body></html>')
+    assert _cls(200, OFFER_URL, html) == "alive"
+
+def test_classify_returns_reason():
+    status, reason = scraper.classify_offer_page(404, OFFER_URL, "")
+    assert status == "dead" and "404" in reason
+
+
+# ── nagłówek OLX ─────────────────────────────────────────────────────────────
+def test_header_count_with_thousands_space():
+    """REGRESJA (scan #142): header=None, bo wzorzec \\d+ nie łapał 'Znaleźliśmy 1 234'."""
+    assert scraper.get_total_count_from_header(_soup("<div>Znaleźliśmy 1 234 ogłoszenia</div>")) == 1234
+    assert scraper.get_total_count_from_header(_soup("<div>Znaleźliśmy 833 ogłoszenia</div>")) == 833
+    assert scraper.get_total_count_from_header(_soup("<div>nic tu nie ma</div>")) is None
 
 
 # ── _days_since ──────────────────────────────────────────────────────────────

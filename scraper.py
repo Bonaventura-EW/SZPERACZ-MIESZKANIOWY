@@ -81,6 +81,12 @@ VERIFY_MAX_LISTINGS    = 150
 # zmianie layoutu OLX: oferta utrzymywana przy życiu wyłącznie weryfikacją
 # (niewidziana w żadnym sweepie) i tak trafia do archiwum po tylu dniach.
 VERIFY_MAX_ALIVE_DAYS  = 7
+# Zapora na WYNIK weryfikacji jako całość. Jeśli niemal wszystkie sprawdzone oferty
+# wychodzą martwe, to nie rynek się zawalił — to klasyfikator przestał działać
+# (scan #142: 143/143 "martwe", bo frazy o nieaktualnym ogłoszeniu jadą w payloadzie
+# SPA na KAŻDEJ stronie). Wtedy odrzucamy całą weryfikację i wracamy do ścieżki 2-scan.
+VERIFY_MAX_DEAD_RATIO  = 0.85
+VERIFY_MIN_SAMPLE      = 20   # poniżej tylu sprawdzeń odsetek nic nie znaczy
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 EXCEL_PATH = os.path.join(DATA_DIR, "szperacz_mieszkaniowy.xlsx")
@@ -424,10 +430,18 @@ def parse_listings_from_soup(soup):
     listings = [l for l in listings if l.get("price") is None or l["price"] <= MAX_PRICE]
     return listings
 
+# Liczba w nagłówku bywa formatowana ze spacją tysięczną (zwykłą lub niełamliwą):
+# "Znaleźliśmy 1 234 ogłoszeń". Wzorzec na samo \d+ zwracał wtedy None i crosscheck
+# przechodził bezrefleksyjnie (scan #142: header=None).
+_HEADER_RE = re.compile(r"Znaleźliśmy\s+([\d\s\u00a0\u202f]+?)\s*ogłosze")
+
 def get_total_count_from_header(soup):
-    for el in soup.find_all(string=re.compile(r"Znaleźliśmy\s+\d+")):
-        m = re.search(r"Znaleźliśmy\s+(\d+)\s+ogłosze", el)
-        if m: return int(m.group(1))
+    for el in soup.find_all(string=_HEADER_RE):
+        m = _HEADER_RE.search(el)
+        if m:
+            digits = re.sub(r"[^\d]", "", m.group(1))
+            if digits:
+                return int(digits)
     return None
 
 def _url_with_params(url, params):
@@ -806,52 +820,73 @@ def scrape_with_crosscheck(profile_key, profile_config):
 # paginacji offsetowej, a OLX potrafi zwrócić niepełne wyniki. Zamiast wnioskować
 # z nieobecności, pytamy OLX wprost o tę ofertę — jej własnym URL-em.
 
-# Frazy ze stron wygaszonych/usuniętych ogłoszeń. Trzymamy pełne zwroty, nie
-# pojedyncze słowa — "zakończone" czy "wygasło" trafiają się też na żywych stronach.
+# Frazy ze stron wygaszonych/usuniętych ogłoszeń. Szukamy ich WYŁĄCZNIE w tekście
+# widocznym — OLX to SPA i w <script> jedzie payload z kompletem stringów tłumaczeń,
+# więc dopasowanie w surowym HTML wychodziło na każdej stronie (scan #142: 143/143
+# ofert uznanych za martwe). Trzymamy pełne zwroty, nie pojedyncze słowa — "zakończone"
+# czy "wygasło" trafiają się też w treści żywych ogłoszeń.
 DEAD_PAGE_MARKERS = (
     "to ogłoszenie jest już nieaktualne",
     "ogłoszenie jest już nieaktualne",
     "ogłoszenie zostało usunięte",
     "ogłoszenie nie jest już dostępne",
-    "nie jest już dostępne",
     "ogłoszenie wygasło",
     "nie znaleźliśmy tej strony",
     "strona, której szukasz, nie istnieje",
     "this ad is no longer available",
 )
 
-# Elementy, które renderuje TYLKO żywa strona oferty.
-ALIVE_PAGE_MARKERS = (
-    'data-testid="ad-price-container"',
-    'data-testid="main-ad-price"',
-    'data-testid="ad_description"',
-    'data-cy="ad_title"',
-    'data-cy="ad_description"',
-    'data-testid="ad-footer-bar-section"',
-)
+# Elementy, które renderuje żywa strona oferty. Sprawdzamy je SELEKTOREM na drzewie
+# DOM (po wycięciu <script>), a nie szukaniem stringa w HTML — z tego samego powodu.
+ALIVE_PAGE_SELECTOR = ", ".join((
+    '[data-testid="ad-price-container"]',
+    '[data-testid="main-ad-price"]',
+    '[data-testid="ad_description"]',
+    '[data-cy="ad_title"]',
+    '[data-cy="ad_description"]',
+    '[data-testid="ad-footer-bar-section"]',
+))
+
+
+def _visible_soup(html):
+    """DOM bez <script>/<style>/<noscript>/<template> — czyli to, co widzi człowiek."""
+    soup = BeautifulSoup(html or "", "lxml")
+    for tag in soup(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    return soup
 
 
 def classify_offer_page(status_code, final_url, html):
     """Czy strona pojedynczej oferty świadczy o tym, że ogłoszenie żyje?
 
-    Zwraca 'dead' | 'alive' | 'unknown'. Do 'dead' schodzimy WYŁĄCZNIE na
-    jednoznaczny sygnał: pomyłka w tę stronę archiwizuje żywą ofertę, a przy
-    blokadzie WAF (403 na wszystkim) zarchiwizowałaby całą bazę w jednym scanie.
-    Wszystko niepewne to 'unknown' → stara ścieżka 2-scan confirmation.
+    Zwraca `(status, powód)`, gdzie status to 'dead' | 'alive' | 'unknown'.
+    Powód idzie do logów — bez niego diagnoza błędnej klasyfikacji wymaga zgadywania.
+
+    Do 'dead' schodzimy WYŁĄCZNIE na jednoznaczny sygnał: pomyłka w tę stronę
+    archiwizuje żywą ofertę, a przy blokadzie WAF (403 na wszystkim) zarchiwizowałaby
+    całą bazę w jednym scanie. Sprzeczne sygnały (żywy layout + fraza o nieaktualnym
+    ogłoszeniu) to też 'unknown' — wtedy decyduje stara ścieżka 2-scan.
     """
     if status_code in (404, 410):
-        return "dead"
+        return "dead", f"HTTP {status_code}"
     if status_code != 200:
-        return "unknown"
-    low = (html or "").lower()
-    if any(m in low for m in DEAD_PAGE_MARKERS):
-        return "dead"
+        return "unknown", f"HTTP {status_code}"
     if final_url and "/oferta/" not in final_url:
         # OLX przekierowuje wygaszone oferty na kategorię lub stronę główną.
-        return "dead"
-    if any(m.lower() in low for m in ALIVE_PAGE_MARKERS):
-        return "alive"
-    return "unknown"
+        return "dead", f"redirect → {final_url[:80]}"
+
+    soup  = _visible_soup(html)
+    text  = re.sub(r"\s+", " ", soup.get_text(" ")).strip().lower()
+    dead  = next((m for m in DEAD_PAGE_MARKERS if m in text), None)
+    alive = soup.select_one(ALIVE_PAGE_SELECTOR) is not None
+
+    if dead and alive:
+        return "unknown", f"sprzeczne sygnały: layout żywy + fraza {dead!r}"
+    if dead:
+        return "dead", f"fraza: {dead!r}"
+    if alive:
+        return "alive", "layout żywej oferty"
+    return "unknown", f"nierozpoznany layout | {_page_title(html)}"
 
 
 def _page_title(html):
@@ -861,17 +896,14 @@ def _page_title(html):
 
 
 def _verify_one_listing(url, profiles):
-    """(status, diagnostyka) dla jednej oferty. Błąd sieci → 'unknown'."""
+    """(status, powód) dla jednej oferty. Błąd sieci → 'unknown'."""
     time.sleep(random.uniform(*VERIFY_JITTER))
     try:
         resp = _thread_http_get(url, profiles, timeout=VERIFY_TIMEOUT_S, max_retries=1)
     except NETWORK_ERRORS as e:
         return "unknown", f"{type(e).__name__}: {e}"
     final_url = str(getattr(resp, "url", "") or url)
-    html      = resp.text or ""
-    status    = classify_offer_page(resp.status_code, final_url, html)
-    detail    = f"HTTP {resp.status_code} | {_page_title(html)}" if status == "unknown" else ""
-    return status, detail
+    return classify_offer_page(resp.status_code, final_url, resp.text or "")
 
 
 def verify_listings_alive(profile_key, missing):
@@ -879,7 +911,7 @@ def verify_listings_alive(profile_key, missing):
     Zwraca (mapa id→status, statystyki)."""
     profiles = _available_impersonate_profiles()
     statuses = {}
-    unknown_samples = []
+    samples  = {}
 
     def _job(listing):
         try:
@@ -892,10 +924,13 @@ def verify_listings_alive(profile_key, missing):
              f"({VERIFY_WORKERS} wątki)...")
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=VERIFY_WORKERS) as ex:
-        for lid, (status, detail) in ex.map(_job, missing):
+        for lid, (status, reason) in ex.map(_job, missing):
             statuses[lid] = status
-            if status == "unknown" and len(unknown_samples) < 3:
-                unknown_samples.append(f"{lid}: {detail}")
+            # Próbki KAŻDEGO werdyktu (nie tylko nierozstrzygniętych) — bez nich
+            # diagnoza błędnej klasyfikacji wymaga zgadywania po samych licznikach.
+            bucket = samples.setdefault(status, [])
+            if len(bucket) < 3:
+                bucket.append(f"{lid}: {reason}")
 
     stats = {
         "checked": len(statuses),
@@ -907,8 +942,9 @@ def verify_listings_alive(profile_key, missing):
     }
     log.info(f"  [{profile_key}] Weryfikacja: żywe={stats['alive']} martwe={stats['dead']} "
              f"nierozstrzygnięte={stats['unknown']} ({stats['duration_s']}s)")
-    for s in unknown_samples:
-        log.info(f"    [VERIFY-UNKNOWN] {s}")
+    for status in ("dead", "alive", "unknown"):
+        for s in samples.get(status, []):
+            log.info(f"    [VERIFY-{status.upper()}] {s}")
     return statuses, stats
 
 
@@ -945,6 +981,24 @@ def verify_missing_for_profile(profile_key, result):
         return
 
     statuses, stats = verify_listings_alive(profile_key, missing)
+
+    # ── Zapora na wynik zbiorczy ──
+    # Prawie same werdykty "martwa" oznaczają awarię klasyfikatora, nie zawał rynku
+    # (scan #142: 143/143 martwych, bo frazy o nieaktualnym ogłoszeniu jadą w payloadzie
+    # SPA na każdej stronie). Odrzucamy wtedy CAŁĄ weryfikację — archiwizacją zajmie się
+    # stara ścieżka 2-scan, która na taki błąd jest odporna.
+    checked = stats["checked"]
+    if checked >= VERIFY_MIN_SAMPLE and stats["dead"] / checked > VERIFY_MAX_DEAD_RATIO:
+        reason = (f"{stats['dead']}/{checked} sprawdzonych ofert wyszło martwych "
+                  f"(> {VERIFY_MAX_DEAD_RATIO*100:.0f}%) — to awaria klasyfikacji, "
+                  f"nie odpływ ofert; odrzucam całą weryfikację")
+        log.error(f"  [{profile_key}] [VERIFY-ABORT] {reason}")
+        stats["skipped"] = reason
+        stats["aborted_dead_ratio"] = round(stats["dead"] / checked, 3)
+        result["verification"] = {}
+        result["verification_stats"] = stats
+        return
+
     result["verification"] = statuses
     result["verification_stats"] = stats
 
