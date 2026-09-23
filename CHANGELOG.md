@@ -4,6 +4,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
 ## [Unreleased]
 
+### 🛡️ Guard: Odróżnienie awarii pobrania strony paginacji od końca wyników
+- `scraper.py::scrape_profile()`: pętla paginacji miała trzy różne warunki `break` (błąd transportu po wyczerpaniu retry w `_http_get`, pusta strona, duplikat ID poprzedniej strony) i wszystkie były nierozróżnialne na wyjściu — funkcja zwracała ten sam `count` bez żadnej flagi. Awaria transportowa w środku paginacji cicho oddawała częściowy wynik, który mógł zmieścić się pod progiem `SANITY_MAX_DROP_RATIO=0.40` i zostać zaksięgowany jako poprawny scan (fałszywa archiwizacja/dołek w trendzie).
+- Wyjście przez `except NETWORK_ERRORS` ustawia teraz `incomplete=True` + `incomplete_reason` w wyniku `scrape_profile()`. Legalne końce (pusta strona, duplikat ID) tego nie ustawiają.
+- `_check_sanity()` traktuje `incomplete=True` jako zawsze-błąd (jak `count=0`), niezależnie od progów procentowych — wpina się w istniejącą bramkę cooldown+retry → `anomaly_detected`, więc `generate_dashboard_json()` nie nadpisuje stanu bez dodatkowej ścieżki kodu.
+- Propagacja z repo-brata `Bonaventura-EW/SZPERACZ` (manifest `2026-09-12-pagination-abort-guard`, issue #4). Wdrożone jako natywne rozszerzenie naszego stosu `requests`/`curl_cffi` (brat używa Playwrighta — nie kopiowaliśmy jego implementacji), i jako rozszerzenie istniejącej bramki anomalii zamiast nowego statusu/alertu.
+
 ### 🛡️ Guard: Retry (429/5xx) + rotacja profilu impersonacji TLS przy 403
 - `scraper.py`: warstwa `curl_cffi` (preferowana ścieżka HTTP) nie miała **żadnego** ponawiania — tylko fallback `requests` miał `Retry`/`HTTPAdapter`. Jeśli OLX/CloudFront zablokowałby akurat odcisk `impersonate="chrome"` (dokładnie taka awaria dotknęła repo-brata: 403 na każdy request jednego profilu, 200 na inny), zostawaliśmy bez fallbacku, a 403 był połykany cicho jako pusta strona.
 - Nowy `IMPERSONATE_PROFILES = [IMPERSONATE_TARGET, "safari", "firefox", "edge"]` (stabilne aliasy zamiast nazw wersjonowanych, które znikają między wydaniami `curl_cffi`) + `_available_impersonate_profiles()` filtruje listę do profili wspieranych przez zainstalowaną wersję biblioteki.

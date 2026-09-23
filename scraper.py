@@ -493,6 +493,12 @@ def scrape_profile(profile_key, profile_config, session):
     prev_page_ids = set()  # ochrona: jeśli kolejna strona zwraca te same ID — koniec
     profiles = _available_impersonate_profiles()
     profile_idx = 0
+    # Pętla paginacji ma dwa różne rodzaje wyjścia i trzeba je rozróżnić:
+    # legalny koniec wyników (pusta strona / duplikat ID) vs. awaria pobrania
+    # strony (_http_get wyczerpał retry/rotację profili TLS). Bez tego rozróżnienia
+    # urwana paginacja wygląda jak poprawny, tylko mniejszy wynik.
+    incomplete = False
+    incomplete_reason = None
 
     while url and page <= max_pages:
         log.info(f"  [{profile_key}] Page {page}: {url}")
@@ -501,6 +507,8 @@ def scrape_profile(profile_key, profile_config, session):
             resp.raise_for_status()
         except NETWORK_ERRORS as e:
             log.error(f"  [{profile_key}] HTTP error page {page}: {e}")
+            incomplete = True
+            incomplete_reason = f"strona {page} nie została pobrana po wyczerpaniu retry: {e}"
             break
         soup = BeautifulSoup(resp.text, "lxml")
         if page == 1:
@@ -527,7 +535,8 @@ def scrape_profile(profile_key, profile_config, session):
         if l["listing_id"] not in seen:
             seen.add(l["listing_id"])
             unique.append(l)
-    return {"listings": unique, "count": len(unique), "header_count": header_count, "pages_scraped": page-1}
+    return {"listings": unique, "count": len(unique), "header_count": header_count, "pages_scraped": page-1,
+            "incomplete": incomplete, "incomplete_reason": incomplete_reason}
 
 # ── Sanity checks (zapora przed pustymi / fałszywymi scanami) ──────────────
 # 4 zabezpieczenia chronią przed sytuacją, gdy OLX zwróci CAPTCHA / pustą stronę
@@ -560,6 +569,10 @@ def _check_sanity(profile_key, result, duration_s, previous_count):
     count  = result.get("count", 0)
     header = result.get("header_count")
     reasons = []
+    # 0) paginacja urwana transportowo — to jest awaria pobrania strony, nie
+    # koniec wyników, więc nie może przejść jako cichy wynik częściowy.
+    if result.get("incomplete"):
+        reasons.append(f"paginacja niepełna: {result.get('incomplete_reason')}")
     # 1) count == 0 → ZAWSZE error (niezależnie od header_count)
     if count == 0:
         reasons.append(f"count=0 (puste wyniki)")
