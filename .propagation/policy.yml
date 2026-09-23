@@ -32,6 +32,10 @@ never_touch:
 # MODELE: decyzje = Sonnet (claude-sonnet-5), programowanie = Opus (claude-opus-4-8).
 default_autonomy: ask
 
+# 2026-09-22 distill-policy: pierwszy przebieg dla tej rodziny (szperacze).
+# bugfix ma dopiero 2 rozstrzygnięte wpisy (100% accepted, 0 odrzuceń) —
+# zdecydowanie za mało danych na jakikolwiek awans (próg ≥8). Zobacz PR dla
+# scorecardu.
 categories: {}
   # css-refactor:   draft
   # a11y-fix:       draft
@@ -39,6 +43,7 @@ categories: {}
 
 # Reguły destylowane z Twoich decyzji — dopisuje je skill `distill-policy`
 # przez PR, który zatwierdzasz. Ręcznie też możesz.
-learned_rules: []
+learned_rules:
+  - "Bugfixy poparte bezpośrednią weryfikacją luki we własnym kodzie (nie kopiowaniem 1:1 z brata o innej architekturze) są akceptowane — dowody: issue#2 (TLS retry+rotacja, wersja okrojona względem manifestu brata), issue#4 (pagination-abort-guard, adaptacja pod stack HTTP+BeautifulSoup zamiast Playwrighta). 2/2 accepted, 0 odrzuceń. Wczesny sygnał, do potwierdzenia przy większej próbie."
   #  - "Nie propaguj niczego, co rusza moduł auth (dotąd 0/6 przyjętych)."
   #  - "Zmiany typu css-refactor przyjmowane w 11/12 → kandydat do awansu na 'draft'."
