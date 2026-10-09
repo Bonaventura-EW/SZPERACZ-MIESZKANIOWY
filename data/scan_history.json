@@ -1,28 +1,6 @@
 {
-  "total_scans": 178,
+  "total_scans": 179,
   "scans": [
-    {
-      "timestamp": "2026-08-22T07:36:29Z",
-      "timestamp_local": "2026-08-22 07:36:29",
-      "status": "success",
-      "duration_seconds": 109,
-      "listings_total": 801,
-      "listings_new": 39,
-      "listings_removed": 56,
-      "scan_number": 129,
-      "profiles": [
-        {
-          "key": "mieszkania_lublin",
-          "label": "Mieszkania na wynajem — Lublin",
-          "listings_total": 801,
-          "listings_new": 39,
-          "listings_removed": 56,
-          "crosscheck": "passed"
-        }
-      ],
-      "error": null,
-      "warning": null
-    },
     {
       "timestamp": "2026-08-23T07:38:06Z",
       "timestamp_local": "2026-08-23 07:38:06",
@@ -1100,6 +1078,28 @@
           "listings_total": 763,
           "listings_new": 38,
           "listings_removed": 49,
+          "crosscheck": "passed"
+        }
+      ],
+      "error": null,
+      "warning": null
+    },
+    {
+      "timestamp": "2026-10-09T14:16:33Z",
+      "timestamp_local": "2026-10-09 14:16:33",
+      "status": "success",
+      "duration_seconds": 140,
+      "listings_total": 767,
+      "listings_new": 43,
+      "listings_removed": 38,
+      "scan_number": 179,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "Mieszkania na wynajem — Lublin",
+          "listings_total": 767,
+          "listings_new": 43,
+          "listings_removed": 38,
           "crosscheck": "passed"
         }
       ],
