@@ -22,6 +22,7 @@ import re
 import time
 import random
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -42,6 +43,12 @@ PROFILES = {
 # odrzucane na etapie parsowania (cicho — bez logów i bez wpływu na crosscheck
 # poza dolnym progiem). Oferty bez ceny (price=None) przepuszczamy.
 MAX_PRICE = 10000
+
+# Szerokość kubełka rozkładu cen (`daily_counts[].price_distribution`, histogram
+# „Rozkład cen" na dashboardzie) — patrz build_price_distribution(). 100 zł, bo
+# ~87% cen mieszkań w Lublinie jest podzielne przez 100 (ceny ogłoszeń zwykle
+# okrągłe), a reszta trafia do najbliższego kubełka bez większej utraty informacji.
+PRICE_DIST_STEP = 100
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 EXCEL_PATH = os.path.join(DATA_DIR, "szperacz_mieszkaniowy.xlsx")
@@ -894,29 +901,27 @@ def load_existing_json():
         except (json.JSONDecodeError, IOError): pass
     return {"profiles":{}, "scan_history":[], "last_scan":None}
 
-def build_price_distribution(listings):
-    """Histogram cen aktywnych ofert (~14 słupków o „ładnym" kroku).
-    Niezmiennik: suma count w słupkach == liczba ofert z dodatnią ceną."""
-    prices = sorted([l["price"] for l in listings if l.get("price") and l["price"] > 0])
-    if not prices:
-        return []
-    mn, mx = prices[0], prices[-1]
-    if mn == mx:
-        return [{"from": mn, "to": mx + 1, "count": len(prices)}]
-    raw = (mx - mn) / 14
-    mag = 10 ** int(len(str(int(raw))) - 1)
-    step = next((f * mag for f in [1, 2, 2.5, 5, 10] if f * mag >= raw), 10 * mag)
-    start = (mn // step) * step
-    buckets = []
-    s = start
-    while s <= mx:
-        cnt = sum(1 for p in prices if p >= s and p < s + step)
-        buckets.append({"from": int(s), "to": int(s + step), "count": cnt})
-        s += step
-    # Przyciągnij puste krawędzie histogramu
-    while len(buckets) > 1 and buckets[-1]["count"] == 0: buckets.pop()
-    while len(buckets) > 1 and buckets[0]["count"] == 0:  buckets.pop(0)
-    return buckets
+def build_price_distribution(listings, step=PRICE_DIST_STEP):
+    """Rozkład cen aktywnych ofert → `daily_counts[].price_distribution` (histogram
+    „Rozkład cen" na dashboardzie).
+
+    Stały krok `step` zł (domyślnie PRICE_DIST_STEP) i siatka wyrównana do zera:
+    kubełek `[from, from+step)` z `from % step == 0`. Zapisujemy WYŁĄCZNIE niepuste
+    kubełki (lista rzadka, posortowana po `from`) — pełny zakres cen, bez progu.
+    Próg prezentacji i dopełnianie zer robi dashboard (docs/index.html), więc da
+    się go zmienić bez przeliczania historii.
+
+    Wcześniej krok był dynamiczny (~14 kubełków między min a max ceną dnia) —
+    pojedyncza droga oferta rozciągała cały histogram, a różne dni miały różną
+    siatkę kubełków, przez co suwak dnia na dashboardzie przestawiał oś. Historię
+    przeliczono skryptem `rebuild_price_distribution.py` (z migawek w historii gita).
+    """
+    counts = defaultdict(int)
+    for l in listings:
+        p = l.get("price")
+        if p and p > 0:
+            counts[int(p) // step * step] += 1
+    return [{"from": f, "to": f + step, "count": counts[f]} for f in sorted(counts)]
 
 def generate_dashboard_json(scan_results, scan_timestamp):
     data    = load_existing_json()

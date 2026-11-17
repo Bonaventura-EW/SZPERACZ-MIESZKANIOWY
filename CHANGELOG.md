@@ -4,6 +4,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/)
 
 ## [Unreleased]
 
+### 📊 Feature: Histogram cen — stała siatka kubełków w danych, próg i oś w prezentacji
+- `scraper.py::build_price_distribution()` liczyła dynamiczny, „ładny" krok (~14 kubełków między min i max ceną *dnia*, zaokrąglony do {1,2,2.5,5,10}×10^n). Pojedyncza droga oferta rozciągała zakres, a różne dni miały różną siatkę kubełków — suwak dnia na histogramie „💰 ROZKŁAD CEN" (`docs/index.html`) przestawiał oś przy każdym przeciągnięciu.
+- Nowy `PRICE_DIST_STEP = 100` (zł) — zamiast dynamicznego kroku, scraper zapisuje teraz WYŁĄCZNIE niepuste kubełki `[from, from+100)` na siatce wyrównanej do zera, bez progu i bez dopełniania zer. Pełny zakres cen zostaje w danych, więc próg/krok prezentacji można zmienić bez przeliczania historii.
+- `docs/index.html`: próg prezentacji `HIST_MAX_PRICE = 5000` zł (oferty droższe pokazywane jako zbiorczy kafelek „Pow. 5000 zł", nie na wykresie) i wspólna oś histogramu liczona ze wszystkich dni profilu (`computeHistAxis()`) — słupki mają teraz tę samą siatkę niezależnie od dnia. Zachowana zgodność z wpisami sprzed migracji (dynamiczny krok, `histOnGrid()`/`histBarsForEntry()`), gdyby historia gita była kiedyś odtwarzana od zera.
+- Wartości `PRICE_DIST_STEP=100`/`HIST_MAX_PRICE=5000` wyznaczone z realnego rozkładu cen mieszkań w Lublinie (87% cen podzielnych przez 100, próg obejmuje ~99% aktywnych ofert, 11/645 ofert ponad niego) — NIE skopiowane 1:1 z repo-brata (tam rynek pokoi, krok 25 zł/próg 1500 zł).
+- Jednorazowy `rebuild_price_distribution.py` przeliczył 90 historycznych wpisów `daily_counts[].price_distribution` z migawek `data/dashboard_data.json` w historii gita, weryfikując że stary algorytm na cenach z migawki odtwarza zapisany rozkład 1:1 przed podstawieniem nowego.
+- Propagacja z repo-brata `Bonaventura-EW/SZPERACZ` (manifest `2026-11-03-price-histogram-fixed-step`, issue #7).
+
 ### 🛡️ Guard: Odróżnienie awarii pobrania strony paginacji od końca wyników
 - `scraper.py::scrape_profile()`: pętla paginacji miała trzy różne warunki `break` (błąd transportu po wyczerpaniu retry w `_http_get`, pusta strona, duplikat ID poprzedniej strony) i wszystkie były nierozróżnialne na wyjściu — funkcja zwracała ten sam `count` bez żadnej flagi. Awaria transportowa w środku paginacji cicho oddawała częściowy wynik, który mógł zmieścić się pod progiem `SANITY_MAX_DROP_RATIO=0.40` i zostać zaksięgowany jako poprawny scan (fałszywa archiwizacja/dołek w trendzie).
 - Wyjście przez `except NETWORK_ERRORS` ustawia teraz `incomplete=True` + `incomplete_reason` w wyniku `scrape_profile()`. Legalne końce (pusta strona, duplikat ID) tego nie ustawiają.
