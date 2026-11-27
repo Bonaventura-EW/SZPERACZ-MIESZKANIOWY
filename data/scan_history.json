@@ -1,28 +1,6 @@
 {
-  "total_scans": 228,
+  "total_scans": 229,
   "scans": [
-    {
-      "timestamp": "2026-10-09T14:16:33Z",
-      "timestamp_local": "2026-10-09 14:16:33",
-      "status": "success",
-      "duration_seconds": 140,
-      "listings_total": 767,
-      "listings_new": 43,
-      "listings_removed": 38,
-      "scan_number": 179,
-      "profiles": [
-        {
-          "key": "mieszkania_lublin",
-          "label": "Mieszkania na wynajem — Lublin",
-          "listings_total": 767,
-          "listings_new": 43,
-          "listings_removed": 38,
-          "crosscheck": "passed"
-        }
-      ],
-      "error": null,
-      "warning": null
-    },
     {
       "timestamp": "2026-10-10T13:29:24Z",
       "timestamp_local": "2026-10-10 13:29:24",
@@ -1100,6 +1078,35 @@
       ],
       "error": null,
       "warning": null
+    },
+    {
+      "timestamp": "2026-11-27T17:21:10Z",
+      "timestamp_local": "2026-11-27 17:21:10",
+      "status": "partial_scan",
+      "duration_seconds": 111,
+      "listings_total": 422,
+      "listings_new": 22,
+      "listings_removed": 63,
+      "scan_number": 229,
+      "profiles": [
+        {
+          "key": "mieszkania_lublin",
+          "label": "Mieszkania na wynajem — Lublin",
+          "listings_total": 422,
+          "listings_new": 22,
+          "listings_removed": 63,
+          "crosscheck": "passed",
+          "partial_scan_warning": {
+            "missing_this_scan": 163,
+            "base_count": 626,
+            "scanned_count": 422,
+            "missing_ratio": 0.26,
+            "message": "163 z 626 ofert (26.0%) zniknęło w jednym scanie — prawdopodobnie niepełny scrape OLX, nie realny odpływ"
+          }
+        }
+      ],
+      "error": null,
+      "warning": "[mieszkania_lublin] 163 z 626 ofert (26.0%) zniknęło w jednym scanie — prawdopodobnie niepełny scrape OLX, nie realny odpływ"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-11-26T17:38:17Z",
-  "total_listings": 515,
+  "last_updated": "2026-11-27T17:21:10Z",
+  "total_listings": 422,
   "scans": [
     {
       "date": "2026-11-26",
@@ -23,5 +23,6 @@
       "added": 18,
       "removed": 23
     }
-  ]
+  ],
+  "warning": "[mieszkania_lublin] 163 z 626 ofert (26.0%) zniknęło w jednym scanie — prawdopodobnie niepełny scrape OLX, nie realny odpływ"
 }
