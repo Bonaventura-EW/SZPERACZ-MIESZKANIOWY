@@ -1,7 +1,14 @@
 {
-  "last_updated": "2026-11-27T17:21:10Z",
-  "total_listings": 422,
+  "last_updated": "2026-11-28T16:04:28Z",
+  "total_listings": 449,
   "scans": [
+    {
+      "date": "2026-11-28",
+      "timestamp": "2026-11-28T16:04:28Z",
+      "total_listings": 449,
+      "added": 19,
+      "removed": 108
+    },
     {
       "date": "2026-11-26",
       "timestamp": "2026-11-26T17:38:17Z",
@@ -15,14 +22,6 @@
       "total_listings": 611,
       "added": 17,
       "removed": 18
-    },
-    {
-      "date": "2026-11-24",
-      "timestamp": "2026-11-24T18:46:01Z",
-      "total_listings": 601,
-      "added": 18,
-      "removed": 23
     }
-  ],
-  "warning": "[mieszkania_lublin] 163 z 626 ofert (26.0%) zniknęło w jednym scanie — prawdopodobnie niepełny scrape OLX, nie realny odpływ"
+  ]
 }
